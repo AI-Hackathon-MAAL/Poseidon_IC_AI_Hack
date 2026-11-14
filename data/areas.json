@@ -1,0 +1,13 @@
+{
+  "areas": [
+    {"id":"revillagigedo","name":"Revillagigedo","summary":"Mexico · Two measured gap records and two park-authority reports. The decree supplies a dated boundary and fishing rule.","status":"Primary demo","sourceIds":["archive","mexico","decree"]},
+    {"id":"dogger-bank","name":"Dogger Bank","summary":"United Kingdom · An annual fishing estimate can support review. The deployed gear is unresolved and the report has no track-level coordinates.","status":"Gear review","sourceIds":["bloom","mmo"]},
+    {"id":"phoenix","name":"Phoenix Islands","summary":"Kiribati · A dated government assessment documents five vessels passing through after the commercial fishing closure began.","status":"Transit control","sourceIds":["kiribati"]}
+  ],
+  "map": {
+    "areaId":"revillagigedo", "bounds":[-115.471415,17.655231,-110.078093,20.008631],
+    "islands":[{"name":"Clarión","lon":-114.72333,"lat":18.35639},{"name":"Socorro","lon":-110.97528,"lat":18.78806},{"name":"San Benedicto","lon":-110.81611,"lat":19.30333},{"name":"Roca Partida","lon":-112.06583,"lat":18.9975}],
+    "source":{"title":"Mexican park decree · general perimeter","url":"https://simec.conanp.gob.mx/pdf_decretos/82_decreto.pdf"},
+    "islandSource":{"title":"UNESCO · island coordinates","url":"https://whc.unesco.org/en/list/1510/maps/"}
+  }
+}

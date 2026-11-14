@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#171b20">
+  <link rel="icon" type="image/svg+xml" href="/poseidon.svg">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/maritime-map.css">
+  <link rel="stylesheet" href="/monitor.css">
+  <title>Monitoring desk — Poseidon</title>
+</head>
+<body>
+  <a class="skip-link" href="#case-section">Skip to investigations</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Poseidon home"><img class="brand-mark" src="/poseidon.svg" alt="" width="26" height="26"><span>Poseidon</span></a>
+    <nav aria-label="Workspace"><a href="/archive">Globe</a><a href="/monitor" aria-current="page">Monitor</a></nav>
+    <span class="header-context">Maritime intelligence</span>
+  </header>
+  <main class="monitor-shell">
+    <div class="monitor-heading"><div><p class="eyebrow" id="dataset">Databricks investigations</p><h1>Monitoring desk<span class="title-period">.</span></h1></div>
+      <button type="button" id="refresh" class="refresh">Refresh snapshot <span aria-hidden="true">↻</span></button>
+    </div>
+    <p id="notice" class="monitor-notice" role="status">Loading snapshot…</p>
+    <div id="workspace" hidden>
+      <section class="run-strip" aria-labelledby="run-title">
+        <div><p class="eyebrow">Latest run</p><h2 id="run-title"></h2><p id="run-window" class="subtle"></p></div>
+        <dl id="run-metrics" class="metrics"></dl>
+      </section>
+      <details id="run-notes" class="run-notes" hidden><summary>Run notes</summary><ul></ul></details>
+      <div class="monitor-grid">
+        <section id="case-section" class="case-index" aria-labelledby="index-title">
+          <div class="section-head"><h2 id="index-title">Case queue</h2><span id="case-total" class="count"></span></div>
+          <div class="filters">
+            <label>Protected area<select id="area-filter"><option value="">All areas</option></select></label>
+            <label>Case mode<select id="mode-filter"><option value="">All modes</option><option value="history">History</option><option value="live">Live</option></select></label>
+          </div>
+          <div id="case-list"></div>
+        </section>
+        <section id="detail" aria-labelledby="case-name"></section>
+      </div>
+      <section class="news-section" aria-labelledby="news-title">
+        <div class="section-head"><h2 id="news-title">Area news</h2><span id="news-total" class="count"></span></div><div id="news"></div>
+      </section>
+    </div>
+  </main>
+  <footer class="monitor-footer"><span id="attribution">Poseidon</span><span id="disclaimer"></span></footer>
+  <script src="/maritime-map.js" defer></script>
+  <script src="/monitor.js" defer></script>
+</body>
+</html>

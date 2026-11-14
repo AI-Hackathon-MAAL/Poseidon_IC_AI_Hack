@@ -1,0 +1,33 @@
+{
+  "name": "Poseidon hourly MPA observations",
+  "description": "Publish a rolling 30-day Global Fishing Watch investigation export for Galápagos and Hermandad.",
+  "max_concurrent_runs": 1,
+  "queue": {"enabled": false},
+  "schedule": {
+    "quartz_cron_expression": "0 0 * * * ?",
+    "timezone_id": "UTC",
+    "pause_status": "UNPAUSED"
+  },
+  "tasks": [
+    {
+      "task_key": "publish_poseidon",
+      "notebook_task": {
+        "source": "WORKSPACE",
+        "notebook_path": "/Workspace/Users/<workspace-user>/Imperial-AI-Hackathon/notebooks/poseidon",
+        "base_parameters": {
+          "mode": "live",
+          "lookback_days": "30",
+          "data_source": "gfw",
+          "mpa_ids": "11753,555745151",
+          "max_cases": "5",
+          "search_provider": "linkup",
+          "force_reinvestigate": "false",
+          "catalog": "workspace",
+          "schema": "poseidon",
+          "snapshot_scope": "this_run_areas",
+          "snapshot_to_repo": "false"
+        }
+      }
+    }
+  ]
+}

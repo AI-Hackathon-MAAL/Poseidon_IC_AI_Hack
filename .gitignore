@@ -19,3 +19,9 @@ venv/
 # Local data dumps (commit only small samples in data/)
 data/raw/
 *.parquet
+
+# Local web workspace
+node_modules/
+.soundings/
+!.env.example
+*.log

@@ -4,6 +4,8 @@ An autonomous agent on Databricks that watches Marine Protected Areas (MPAs) for
 
 ## Poseidon: the current system
 
+Open the globe locally with `npm start` on Node.js 22 or newer, then visit [Poseidon](http://127.0.0.1:3000/). The globe reads the published snapshot in `data/`. Select a vessel to explore its recorded positions and open its agent report. [Frontend guide](app/README.md)
+
 **Run `notebooks/poseidon`.** One notebook, two modes that differ only by time window:
 
 | Mode | Window | Use |

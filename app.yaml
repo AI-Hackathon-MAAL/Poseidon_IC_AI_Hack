@@ -1,0 +1,4 @@
+command: ["node", "server.mjs"]
+env:
+  - name: POSEIDON_VOLUME
+    valueFrom: poseidon-exports
