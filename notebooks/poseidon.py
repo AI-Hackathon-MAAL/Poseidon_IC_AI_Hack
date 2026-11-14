@@ -20,26 +20,72 @@
 
 # COMMAND ----------
 
-import sys, json, html
+import sys, json, html, types
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.dont_write_bytecode = True
+MODULES = ["gfw", "search", "scoring", "agent", "brief", "pipeline", "contract", "sample"]   # dependency order
 roots = [Path.cwd(), *Path.cwd().parents]
 try:  # Databricks can run a notebook with a working directory outside the Git folder
     nb_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
     here = Path("/Workspace") / nb_path.lstrip("/")
     roots = [here.parent, *here.parent.parents, *roots]
 except Exception:
-    pass
-repo = next((r for r in roots if (r / "poseidon" / "agent.py").is_file()), None)
-if repo is None:
-    raise RuntimeError("Open this notebook inside the Imperial-AI-Hackathon Git folder (Pull main first). "
-                       "The poseidon/ folder must sit next to notebooks/.")
-if str(repo) not in sys.path:
-    sys.path.insert(0, str(repo))
+    nb_path, here = None, None
 for name in [m for m in sys.modules if m == "poseidon" or m.startswith("poseidon.")]:
     del sys.modules[name]   # pick up freshly pulled code without restarting
+
+
+def load_from_files():
+    repo = next((r for r in roots if (r / "poseidon" / "agent.py").is_file()), None)
+    if repo is None:
+        raise FileNotFoundError("poseidon/ folder not found next to notebooks/")
+    if str(repo) not in sys.path:
+        sys.path.insert(0, str(repo))
+    import poseidon.agent, poseidon.contract  # noqa: F401  (raises OSError if the files cannot be read)
+    return repo
+
+
+def load_via_workspace_api():
+    """Fallback for folders whose .py files cannot be read directly (copies, Shared folders):
+    fetch each module's source through the Workspace API and build the package in memory."""
+    import base64
+    from databricks.sdk import WorkspaceClient
+    from databricks.sdk.service.workspace import ExportFormat
+    wc = WorkspaceClient()
+    base = "/" + str(here.parent.parent).replace("/Workspace/", "", 1).lstrip("/") if here else None
+    if not base:
+        raise RuntimeError("Cannot tell where this notebook lives.")
+    pkg = types.ModuleType("poseidon")
+    pkg.__path__, pkg.__package__ = [], "poseidon"
+    sys.modules["poseidon"] = pkg
+    for mod in MODULES:
+        code = None
+        for candidate in (f"{base}/poseidon/{mod}.py", f"{base}/poseidon/{mod}"):
+            try:
+                code = base64.b64decode(wc.workspace.export(candidate, format=ExportFormat.SOURCE).content).decode("utf-8")
+                break
+            except Exception:
+                continue
+        if code is None:
+            raise RuntimeError(f"Could not read poseidon/{mod} under {base}. Pull the latest code.")
+        m = types.ModuleType(f"poseidon.{mod}")
+        m.__package__ = "poseidon"
+        m.__file__ = f"{base}/poseidon/{mod}.py"
+        sys.modules[m.__name__] = m
+        exec(compile(code, m.__file__, "exec"), m.__dict__)
+        setattr(pkg, mod, m)
+    return Path("/Workspace" + base)
+
+
+try:
+    repo = load_from_files()
+except Exception as first_error:
+    print(f"Direct import failed ({type(first_error).__name__}: {str(first_error)[:120]}); loading via the Workspace API.")
+    for name in [m for m in sys.modules if m == "poseidon" or m.startswith("poseidon.")]:
+        del sys.modules[name]
+    repo = load_via_workspace_api()
 
 from poseidon import contract, pipeline, sample
 from poseidon.agent import Context
