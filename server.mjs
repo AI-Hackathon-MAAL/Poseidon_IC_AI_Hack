@@ -5,10 +5,15 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { areas, map, replay, listItem, rankCases, investigate, validCatalog } from './investigator.mjs';
 import { loadCandidates, recordBrief, readBrief } from './providers.mjs';
+import { createSnapshotReader } from './snapshot.mjs';
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const assets = new Map([
   ['/', ['index.html', 'text/html']],
+  ['/archive', ['index.html', 'text/html']],
+  ['/monitor', ['monitor.html', 'text/html']],
+  ['/monitor.js', ['monitor.js', 'text/javascript']],
+  ['/monitor.css', ['monitor.css', 'text/css']],
   ['/poseidon.svg', ['poseidon.svg', 'image/svg+xml']],
   ['/app.js', ['app.js', 'text/javascript']],
   ['/style.css', ['style.css', 'text/css']],
@@ -44,7 +49,7 @@ async function save(dir, brief) {
   }
 }
 
-export function createApp({dataDir = resolve(root,'.soundings','briefs'), candidates = loadCandidates, store = recordBrief, readStored = readBrief, search, model, lookupHistory} = {}) {
+export function createApp({dataDir = resolve(root,'.soundings','briefs'), candidates = loadCandidates, store = recordBrief, readStored = readBrief, search, model, lookupHistory, readSnapshot = createSnapshotReader()} = {}) {
   const pendingRuns = new Map();
   async function complete(record, records, origin) {
     const brief = await investigate(record,records,{search,model,lookupHistory,origin});
@@ -63,6 +68,18 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
     res.setHeader('Referrer-Policy','no-referrer');
     const path = (req.url || '/').split('?')[0];
     try {
+      if (req.method === 'GET' && path === '/' && process.env.DATABRICKS_APP_NAME) {
+        return res.writeHead(302, {Location: '/monitor'}).end();
+      }
+      if (req.method === 'GET' && path === '/api/snapshot') {
+        try {
+          const snapshot = await readSnapshot();
+          res.setHeader('X-Poseidon-Source', snapshot.source);
+          return json(res, 200, snapshot.data);
+        } catch {
+          return json(res, 503, {error: 'The Poseidon export is unavailable. Check that the notebook published a snapshot and the app can read it.'});
+        }
+      }
       if (req.method === 'GET' && assets.has(path)) {
         const [filename,type] = assets.get(path);
         const content = await readAsset(filename);
@@ -84,7 +101,9 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
         return brief ? json(res,200,brief) : json(res,404,{error:'This case has no saved brief.'});
       }
       if (req.method === 'POST' && path === '/api/investigate') {
-        if (req.headers.origin && req.headers.origin !== 'http://' + req.headers.host) return json(res,403,{error:'Use this local analyst workspace to run an investigation.'});
+        const workspaceOrigin = process.env.DATABRICKS_APP_URL
+          ? new URL(process.env.DATABRICKS_APP_URL).origin : 'http://' + req.headers.host;
+        if (req.headers.origin && req.headers.origin !== workspaceOrigin) return json(res,403,{error:'Use this analyst workspace to run an investigation.'});
         if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(res,415,{error:'Send a JSON case ID.'});
         let payload;
         try { payload = await body(req); } catch {return json(res,400,{error:'Supply a small JSON object with a caseId.'});}
@@ -112,8 +131,9 @@ async function readAsset(name) {
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  const port = Number(process.env.PORT || 3000);
+  const port = Number(process.env.DATABRICKS_APP_PORT || process.env.PORT || 3000);
+  const host = process.env.DATABRICKS_APP_PORT ? '0.0.0.0' : '127.0.0.1';
   const app = createApp();
   app.on('error', e => { console.error('Unable to start Poseidon:',e.code); process.exitCode = 1; });
-  app.listen(port,'127.0.0.1',() => console.info('Poseidon is open at http://127.0.0.1:' + app.address().port));
+  app.listen(port,host,() => console.info('Poseidon is listening on ' + host + ':' + app.address().port));
 }

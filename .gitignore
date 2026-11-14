@@ -1,6 +1,27 @@
-node_modules/
-.soundings/
+# Secrets — never commit keys
 .env
 .env.*
+*.key
+secrets/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+
+# Local data dumps (commit only small samples in data/)
+data/raw/
+*.parquet
+
+# Local web workspace
+node_modules/
+.soundings/
 !.env.example
 *.log
