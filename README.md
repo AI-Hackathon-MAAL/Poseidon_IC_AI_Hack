@@ -46,3 +46,10 @@ Tables live in `workspace.dark_fishing` by default (change the `catalog` / `sche
 ## Data attribution
 
 Uses data from [Global Fishing Watch](https://globalfishingwatch.org) under their API terms (non-commercial use; attribution required).
+
+## Latest available Galápagos brief
+
+Run `notebooks/03_live_mpa_monitor.py` in Databricks for a rolling-window GFW
+brief, explicit tracking-gap assessments, and retained report history.
+See [live monitoring setup](docs/live-monitor.md) for credentials, MPA selection,
+hourly scheduling, and data-freshness limits.
