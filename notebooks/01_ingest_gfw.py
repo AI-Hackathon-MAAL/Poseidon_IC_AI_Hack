@@ -53,16 +53,29 @@ except requests.exceptions.ConnectionError as e:
 
 mpa_payload = r.json()
 mpa_records = mpa_payload if isinstance(mpa_payload, list) else mpa_payload.get("entries", mpa_payload.get("data", []))
+import unicodedata
+
+def mpa_name(m):
+    for k in ("label", "name", "NAME", "nameEn", "orig_name", "ORIG_NAME", "wdpaName"):
+        if m.get(k):
+            return str(m[k])
+    return None
+
+def fold(s):
+    """Lower-case and strip accents so 'Galapagos' matches 'Galápagos'."""
+    return "".join(c for c in unicodedata.normalize("NFKD", s or "") if not unicodedata.combining(c)).lower()
+
 mpa_rows = [
-    {"mpa_id": str(m.get("id")), "mpa_name": m.get("label") or m.get("name"), "raw": json.dumps(m)}
+    {"mpa_id": str(m.get("id")), "mpa_name": mpa_name(m), "search_text": fold(json.dumps(m, ensure_ascii=False)),
+     "raw": json.dumps(m, ensure_ascii=False)}
     for m in mpa_records
 ]
-print(f"{len(mpa_rows)} MPAs")
-spark.createDataFrame(mpa_rows).write.mode("overwrite").saveAsTable(f"{CATALOG}.{SCHEMA}.mpas")
+print(f"{len(mpa_rows)} MPAs; example record keys: {list(mpa_records[0].keys()) if mpa_records else []}")
+spark.createDataFrame(mpa_rows).write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{CATALOG}.{SCHEMA}.mpas")
 
-search = dbutils.widgets.get("mpa_search").strip()
+search = fold(dbutils.widgets.get("mpa_search").strip()).replace("'", "")
 if search:
-    display(spark.sql(f"SELECT mpa_id, mpa_name FROM {CATALOG}.{SCHEMA}.mpas WHERE lower(mpa_name) LIKE lower('%{search}%') LIMIT 50"))
+    display(spark.sql(f"SELECT mpa_id, mpa_name, raw FROM {CATALOG}.{SCHEMA}.mpas WHERE search_text LIKE '%{search}%' LIMIT 50"))
 else:
     print("Tip: type a name in the 'Search MPAs by name' widget, rerun this cell, and copy ids into 'mpa_ids'.")
 
