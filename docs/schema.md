@@ -55,4 +55,5 @@ One row per lead the agent investigated. **Front end reads this.**
 | reasons | string | JSON array of plain-language reasons |
 | sources | string | JSON array of `{title, url}` the agent cited |
 | brief_markdown | string | The one-page brief |
+| agent_trace | string | JSON array of `{step, detail, data, at}` — what the agent did, for the live replay in the UI |
 | created_at | timestamp | |

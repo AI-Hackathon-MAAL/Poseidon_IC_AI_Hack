@@ -37,6 +37,9 @@ Front end  <── briefs table  <── agent loop (vessel history, web check, 
 3. **Run the notebooks in order:**
    - `00_load_sample_data` — writes synthetic data into the tables (no keys needed)
    - `01_ingest_gfw` — pulls real MPA list + events from Global Fishing Watch
+   - `02_run_agent` — investigates leads and writes the `briefs` table (set `source` to `gfw` for real data)
+
+Front end: build against `data/sample_briefs.json` (same shape as the `briefs` table) until the real table is ready.
 
 Tables live in `workspace.dark_fishing` by default (change the `catalog` / `schema` widgets if needed).
 
