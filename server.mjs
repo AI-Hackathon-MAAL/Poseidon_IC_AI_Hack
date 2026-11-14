@@ -6,10 +6,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { areas, map, replay, listItem, rankCases, investigate, validCatalog } from './investigator.mjs';
 import { loadCandidates, recordBrief, readBrief } from './providers.mjs';
 import { createSnapshotReader } from './snapshot.mjs';
+import { isMissingBundledExport, serveGlobe } from './app/host.mjs';
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const assets = new Map([
-  ['/', ['index.html', 'text/html']],
   ['/archive', ['index.html', 'text/html']],
   ['/snapshot-workspace.mjs', ['snapshot-workspace.mjs', 'text/javascript']],
   ...['case-query', 'published-export', 'vessel-photo', 'globe-workspace'].map(name =>
@@ -72,15 +72,17 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
       if (req.method === 'GET' && (path === '/monitor' || path === '/monitor/')) {
         return res.writeHead(302, {Location: '/', 'Cache-Control': 'no-store'}).end();
       }
-      if (req.method === 'GET' && path === '/api/snapshot') {
+      if (req.method === 'GET' && (path === '/api/snapshot' || path === '/data/poseidon_snapshot.json')) {
         try {
           const snapshot = await readSnapshot();
           res.setHeader('X-Poseidon-Source', snapshot.source);
           return json(res, 200, snapshot.data);
-        } catch {
-          return json(res, 503, {error: 'The Poseidon export is unavailable. Check that the notebook published a snapshot and the app can read it.'});
+        } catch (error) {
+          const status = path === '/data/poseidon_snapshot.json' && isMissingBundledExport(error) ? 404 : 503;
+          return json(res, status, {error: 'The Poseidon export is unavailable. Check that the notebook published a snapshot and the app can read it.'});
         }
       }
+      if (req.method === 'GET' && await serveGlobe(path, res)) return;
       if (req.method === 'GET' && assets.has(path)) {
         const [filename,type] = assets.get(path);
         const content = await readAsset(filename);

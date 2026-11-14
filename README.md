@@ -98,8 +98,8 @@ A separate scheduled notebook (`notebooks/03_live_mpa_monitor.py`) supports roll
 | `scripts/make_sample_snapshot.py` | Regenerates the synthetic sample snapshot |
 | `notebooks/` | Databricks notebooks (source format — import via Workspace > Import, or Git folder) |
 | `agent/` | Agent loop, tools, prompts, and live monitor client |
-| `public/`, `server.mjs` | Globe, investigation monitor, and server API |
-| `app/` | Original front-end handoff notes |
+| `app/` | Globe, vessel explorer, published agent reports and static preview ([front-end guide](app/README.md)) |
+| `public/`, `server.mjs` | Shared map helpers, historical replay, and server routes for the configured export |
 | `data/` | Real notebook export, published archive records, and separate synthetic test fixtures |
 | `docs/schema.md` | Table schemas the agent and front end agree on |
 | `docs/live-monitor.md` | Setup and scheduling notes for `03_live_mpa_monitor.py` |
