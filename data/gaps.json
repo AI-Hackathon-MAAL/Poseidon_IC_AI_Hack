@@ -1,0 +1,61 @@
+{
+  "inspected": 55368,
+  "events": [
+    {
+      "id": "945bfa8b023530615828d30a986c661a",
+      "areaId": "revillagigedo",
+      "kind": "AIS reporting gap",
+      "title": "Signal resumes inside the park",
+      "vessel": "MMSI 345080023",
+      "mmsi": "345080023",
+      "date": "2019-03-17",
+      "endDate": "2019-03-18",
+      "start": "2019-03-17T18:34:34.000Z",
+      "end": "2019-03-18T19:25:59.000Z",
+      "mapPoints": [
+        {
+          "lon": -114.9745716667,
+          "lat": 15.413635,
+          "label": "Last signal"
+        },
+        {
+          "lon": -111.3816433333,
+          "lat": 19.18102,
+          "label": "Signal resumed"
+        }
+      ],
+      "evidenceType": "measured-gap",
+      "location": "Eastern tropical Pacific",
+      "datasetHours": 24.85,
+      "gear": "tuna_purse_seines"
+    },
+    {
+      "id": "9f4c1877337eed5d232d9bd030f10f08",
+      "areaId": "revillagigedo",
+      "kind": "AIS reporting gap",
+      "title": "Signal resumes inside the park",
+      "vessel": "MMSI 345080025",
+      "mmsi": "345080025",
+      "date": "2019-10-23",
+      "endDate": "2019-11-08",
+      "start": "2019-10-23T15:03:29.000Z",
+      "end": "2019-11-08T00:49:17.000Z",
+      "mapPoints": [
+        {
+          "lon": -137.59923,
+          "lat": 1.8616616667,
+          "label": "Last signal"
+        },
+        {
+          "lon": -111.4977616667,
+          "lat": 19.9799283333,
+          "label": "Signal resumed"
+        }
+      ],
+      "evidenceType": "measured-gap",
+      "location": "Eastern tropical Pacific",
+      "datasetHours": 369.75,
+      "gear": "tuna_purse_seines"
+    }
+  ]
+}
