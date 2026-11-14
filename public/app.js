@@ -45,145 +45,63 @@ function mapData() {
 }
 function drawMap(points = []) {
   const map = mapData();
-  $('map').replaceChildren();
-  if (!map?.bounds) {
-    const empty = make('p', 'Verified boundary geometry is unavailable for this area. Open the case sources for geographic context.', 'muted');
-    empty.style.padding = '30px';
-    $('map').append(empty);
-    $('boundary-source').removeAttribute('href');
-    $('boundary-source').textContent = '';
-    $('map-caption').textContent = 'Source-led case review';
-    return;
-  }
-  const original = map.bounds;
-  const longs = points.map(p => Number(p.lon)).filter(Number.isFinite);
-  const lats = points.map(p => Number(p.lat)).filter(Number.isFinite);
-  const west = Math.min(original[0], ...longs),
-    south = Math.min(original[1], ...lats),
-    east = Math.max(original[2], ...longs),
-    north = Math.max(original[3], ...lats);
-  const padX = Math.max(.5, (east - west) * .13),
-    padY = Math.max(.35, (north - south) * .2);
-  const bounds = [west - padX, south - padY, east + padX, north + padY];
-  const project = (lon, lat) => [(lon - bounds[0]) / (bounds[2] - bounds[0]) * 640 + 20, 300 - (lat - bounds[1]) / (bounds[3] - bounds[1]) * 280];
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', '0 0 680 320');
-  svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', 'Protected area boundary and reported observations. Points show observations only. No route is drawn during reporting gaps.');
-  function shape(tag, attrs, text) {
-    const el = document.createElementNS(ns, tag);
-    for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
-    if (text) el.textContent = text;
-    svg.append(el);
-    return el;
-  }
-  for (let i = 0; i <= 6; i++) {
-    const x = 20 + i * 106.66;
-    shape('line', {
-      x1: x,
-      y1: 18,
-      x2: x,
-      y2: 300,
-      stroke: '#bad0c4',
-      'stroke-width': '.6'
+  const area = catalog.areas.find(area => area.id === $('area').value);
+  if (window.SoundingsMap) {
+    window.SoundingsMap.render($('map'), {
+      area, map: map || null, points,
+      caseId: selected?.id, caseTitle: selected?.title
     });
-    const value = bounds[0] + i / 6 * (bounds[2] - bounds[0]);
-    shape('text', {
-      x,
-      y: 313,
-      fill: '#57766c',
-      'font-size': '9',
-      'text-anchor': 'middle'
-    }, `${Math.abs(value).toFixed(1)}°${value < 0 ? 'W' : 'E'}`);
+  } else {
+    $('map').replaceChildren(make('p', 'Map unavailable. The case evidence remains available below.', 'queue-empty'));
   }
-  for (let i = 0; i <= 4; i++) {
-    const y = 20 + i * 70;
-    shape('line', {
-      x1: 20,
-      y1: y,
-      x2: 660,
-      y2: y,
-      stroke: '#bad0c4',
-      'stroke-width': '.6'
-    });
+  $('map-caption').textContent = points.length
+    ? 'Recorded positions · Route during the gap unknown'
+    : map ? 'Protected-area context · Select a measured event for positions'
+    : 'Regional context · Source report has no track-level coordinates';
+  const source = safeLink(map?.source ? 'Boundary source ↗' : '', map?.source?.url);
+  source.id = 'boundary-source';
+  $('boundary-source').replaceWith(source);
+  document.querySelector('.map-key').hidden = !map?.bounds;
+}
+function renderFacts(record) {
+  $('case-facts').replaceChildren();
+  const elapsedHours = (Date.parse(record.end) - Date.parse(record.start)) / 3600000;
+  const gapDuration = Number.isFinite(elapsedHours) && elapsedHours >= 0
+    ? elapsedHours.toFixed(2) + ' hours'
+    : Number.isFinite(record.datasetHours) ? record.datasetHours.toFixed(2) + ' hours (archive)' : null;
+  const facts = [
+    ['Vessel', record.vessel],
+    ['Record period', record.kind === 'Annual estimate' ? record.date.slice(0,4) : date(record.date).split(' · ')[0]],
+    ['Reporting gap', gapDuration],
+    ['Recorded positions', record.mapPoints?.length ? String(record.mapPoints.length) : null]
+  ];
+  for (const [label, value] of facts) {
+    if (!value) continue;
+    const fact = make('div', null, 'case-fact');
+    fact.append(make('span', label), document.createTextNode(value));
+    $('case-facts').append(fact);
   }
-  const [left, top] = project(original[0], original[3]);
-  const [right, bottom] = project(original[2], original[1]);
-  shape('rect', {
-    x: left,
-    y: top,
-    width: right - left,
-    height: bottom - top,
-    fill: '#c5dbcb',
-    'fill-opacity': '.55',
-    stroke: '#367a68',
-    'stroke-dasharray': '5 4',
-    'stroke-width': '1.5'
-  });
-  shape('text', {
-    x: left + 12,
-    y: top + 19,
-    fill: '#367a68',
-    'font-size': '9',
-    'letter-spacing': '1.2'
-  }, 'PROTECTED AREA');
-  for (const island of map.islands || []) {
-    const [x, y] = project(island.lon, island.lat);
-    shape('circle', {
-      cx: x,
-      cy: y,
-      r: 3.5,
-      fill: '#6c8670'
-    });
-    shape('text', {
-      x: x + 8,
-      y: y - 5,
-      fill: '#32534b',
-      'font-family': 'Georgia,serif',
-      'font-size': '12'
-    }, island.name);
+}
+function resetBrief(record) {
+  $('priority').textContent = record ? 'Awaiting review' : 'No case selected';
+  $('priority').removeAttribute('data-state');
+  $('brief').className = 'brief-empty';
+  $('brief').replaceChildren();
+  const glyph = make('div', null, 'brief-glyph');
+  glyph.setAttribute('aria-hidden', 'true');
+  glyph.append(make('span'), make('span'), make('span'));
+  $('brief').append(glyph, make('p', 'Evidence-led investigation', 'eyebrow'),
+    make('h3', record ? 'What happened in these waters?' : 'Choose an observation.'),
+    make('p', record ? 'Run the agent to check the record, verify dated sources and identify the next review action.' : 'Select another area or expand the date range to find a case.'));
+  if (record) {
+    const checklist = make('div', null, 'brief-checklist');
+    for (const text of ['Check the event', 'Verify the context', 'Identify what to review']) {
+      const row = make('span', '◇');
+      row.append(make('b', text));
+      checklist.append(row);
+    }
+    $('brief').append(checklist);
   }
-  points.forEach((point, index) => {
-    if (!Number.isFinite(Number(point.lon)) || !Number.isFinite(Number(point.lat))) return;
-    const [x, y] = project(Number(point.lon), Number(point.lat));
-    shape('circle', {
-      cx: x,
-      cy: y,
-      r: 10,
-      fill: '#fff9eb',
-      stroke: '#a65430',
-      'stroke-width': '1.5'
-    });
-    shape('text', {
-      x,
-      y: y + 3.5,
-      fill: '#8c4428',
-      'font-size': '10',
-      'text-anchor': 'middle'
-    }, String(index + 1));
-    const label = shape('text', {
-      x: Math.max(25, Math.min(540, x + 14)),
-      y: y + 20,
-      fill: '#8c4428',
-      'font-size': '9'
-    }, point.label || 'Reported position');
-    const title = document.createElementNS(ns, 'title');
-    title.textContent = point.label || 'Reported position';
-    label.append(title);
-  });
-  shape('text', {
-    x: 637,
-    y: 35,
-    fill: '#367a68',
-    'font-size': '11'
-  }, 'N ↑');
-  $('map').append(svg);
-  $('map-caption').textContent = points.length ? 'Observed endpoints · intervening route unknown' : 'Geographic context · no inferred vessel route';
-  const link = safeLink('Boundary source ↗', map.source?.url);
-  $('boundary-source').replaceWith(Object.assign(link, {
-    id: 'boundary-source'
-  }));
 }
 function selectCase(record) {
   if (running) return;
@@ -198,12 +116,13 @@ function selectCase(record) {
   $('case-meta').textContent = [record.vessel, casePeriod(record), typeof record.location === 'string' ? record.location : null].filter(Boolean).join(' · ');
   $('investigate').disabled = false;
   $('investigate').textContent = 'Investigate ↗';
+  $('status').className = 'status';
   $('status').textContent = '';
-  $('timeline').replaceChildren();
-  $('priority').textContent = 'Awaiting review';
-  $('brief').className = 'brief-empty';
-  $('brief').replaceChildren(make('div', '✧', 'compass'), make('h3', 'Ready to review the evidence.'), make('p', 'Run the investigation to examine the record, check sources and prepare the next step.'));
-  drawMap();
+  $('timeline').replaceChildren(make('p', 'Run the agent to check the event, vessel history and dated sources.', 'activity-empty'));
+  $('activity-state').textContent = 'Awaiting investigation';
+  resetBrief(record);
+  renderFacts(record);
+  drawMap(record.mapPoints || []);
   const version = ++selectionVersion;
   fetch('/api/briefs/' + encodeURIComponent(record.id)).then(async response => {
     if (!response.ok) return;
@@ -218,6 +137,7 @@ function renderQueue() {
   const area = catalog.areas.find(area => area.id === $('area').value);
   $('map-title').textContent = area?.name || 'Protected waters';
   $('area-summary').textContent = area?.summary || '';
+  $('footer-area').textContent = area?.name?.toUpperCase() || 'SOUNDINGS';
   const from = $('date-from').value;
   const through = $('date-to').value;
   const invalidRange = Boolean(from && through && from > through);
@@ -234,8 +154,8 @@ function renderQueue() {
     const button = make('button', null, 'case');
     button.type = 'button';
     button.dataset.id = String(record.id);
-    button.append(make('span', record.synthetic ? 'Simulated control' : record.kind || 'Historical event', 'type'), make('strong', record.title || record.vessel), make('small', casePeriod(record)));
-    if (record.priority != null) button.append(make('span', `Review priority · ${record.priority}`, 'queue-priority'));
+    button.append(make('span', record.synthetic ? 'Simulated control' : record.kind || 'Historical event', 'type'), make('strong', record.title || record.vessel), make('span', record.vessel, 'case-vessel'), make('small', casePeriod(record)));
+    if (record.priority != null) button.append(make('span', record.priority, 'queue-priority'));
     button.addEventListener('click', () => selectCase(record));
     $('cases').append(button);
   }
@@ -248,9 +168,9 @@ function renderQueue() {
     $('case-meta').textContent = 'Select another area or expand the date range.';
     $('status').textContent = '';
     $('timeline').replaceChildren();
-    $('priority').textContent = 'Awaiting review';
-    $('brief').className = 'brief-empty';
-    $('brief').replaceChildren(make('h3', 'Choose a historical event.'), make('p', 'The investigation brief will appear here after reviewing a case.'));
+    resetBrief(null);
+    $('activity-state').textContent = 'No candidate selected';
+    $('case-facts').replaceChildren();
     drawMap();
   }
 }
@@ -258,8 +178,23 @@ function renderBrief(brief) {
   $('brief').className = 'brief-body';
   $('brief').replaceChildren();
   $('priority').textContent = String(brief.priority || 'Review');
+  $('priority').dataset.state = 'ready';
+  $('activity-state').textContent = 'Review ready';
   if (brief.synthetic) $('brief').append(make('p', 'Simulated control case.', 'tag'));
   $('brief').append(make('p', brief.summary));
+  const overview = make('div', null, 'evidence-overview');
+  for (const [label, value] of [['Observations', brief.observations?.length || 0], ['Sources', brief.sources?.length || 0]]) {
+    const metric = make('div');
+    metric.append(make('strong', String(value)), make('span', label));
+    overview.append(metric);
+  }
+  $('brief').append(overview);
+  const actions = make('div', null, 'brief-actions');
+  const download = make('button', 'Download brief ↓', 'text-button');
+  download.type = 'button';
+  download.addEventListener('click', () => downloadBrief(brief));
+  actions.append(download);
+  $('brief').append(actions);
   $('brief').append(make('h3', 'Recorded observations'));
   const observations = make('ol');
   for (const observation of brief.observations || []) {
@@ -289,7 +224,8 @@ function renderBrief(brief) {
     sources.append(item);
   }
   $('brief').append(sources);
-  const runtime = make('div', null, 'runtime');
+  const runtime = make('details', null, 'runtime');
+  runtime.append(make('summary', 'Data & investigation provenance'));
   runtime.append(make('div', 'Investigator · ' + (brief.agent?.mode === 'model' ? 'Databricks model' : 'Rules-based replay')),
     make('div', 'Candidate data · ' + brief.candidateOrigin));
   runtime.append(make('div', `Search · ${brief.search?.mode || 'unavailable'}${brief.search?.detail ? ' — ' + brief.search.detail : ''}`), make('div', `Brief storage · ${brief.storage?.mode || 'unavailable'}${brief.storage?.detail ? ' — ' + brief.storage.detail : ''}`));
@@ -315,6 +251,13 @@ $('investigate').addEventListener('click', async () => {
   $('investigate').textContent = 'Investigating…';
   $('status').className = 'status';
   $('status').textContent = 'Checking the event, its sources and the applicable rule…';
+  $('activity-state').textContent = 'Agent running';
+  document.querySelector('.desk').classList.add('running');
+  const pendingStep = make('div', null, 'step working');
+  const pendingContent = make('div');
+  pendingContent.append(make('strong', 'Investigating selected case'), make('p', 'Reviewing the event, vessel history and source evidence.'));
+  pendingStep.append(pendingContent);
+  $('timeline').replaceChildren(pendingStep);
   try {
     const response = await fetch('/api/investigate', {
       method: 'POST',
@@ -332,8 +275,11 @@ $('investigate').addEventListener('click', async () => {
   } catch (error) {
     $('status').className = 'status error';
     $('status').textContent = error.message || 'Unable to investigate. Please try again.';
+    $('activity-state').textContent = 'Retry available';
+    $('timeline').replaceChildren(make('p', 'The investigation could not complete. Run it again to retry.', 'activity-empty'));
   } finally {
     running = false;
+    document.querySelector('.desk').classList.remove('running');
     $('investigate').disabled = false;
     $('area').disabled = false;
     $('date-from').disabled = false;
@@ -349,6 +295,7 @@ async function initialize() {
     const response = await fetch('/api/catalog');
     if (!response.ok) throw new Error('Unable to load the case catalog. Refresh to try again.');
     catalog = await response.json();
+    $('data-mode').textContent = catalog.origin === 'Databricks' ? 'Databricks records' : 'Published archive';
     $('area').replaceChildren();
     for (const area of catalog.areas) {
       const option = make('option', area.name);
@@ -361,6 +308,38 @@ async function initialize() {
     $('status').textContent = error.message;
     $('area').replaceChildren(make('option', 'Catalog unavailable'));
     $('area').disabled = true;
+    $('data-mode').textContent = 'Archive unavailable';
+    $('cases').replaceChildren(make('p', 'Case catalog unavailable. Refresh the page to reconnect.', 'queue-empty'));
   }
 }
 initialize();
+
+function downloadBrief(brief) {
+  const rows = [selected?.title || 'Soundings investigation brief', '', brief.summary, '', 'RECORDED OBSERVATIONS'];
+  const sources = brief.sources || [];
+  const sourceNumbers = new Map(sources.map((source, index) => [source.id, index + 1]));
+  for (const observation of brief.observations || []) {
+    const citations = (observation.sourceIds || []).filter(id => sourceNumbers.has(id)).map(id => '[' + sourceNumbers.get(id) + ']');
+    rows.push([date(observation.date) + ' — ' + observation.text, ...citations].join(' '));
+  }
+  rows.push('', 'WHAT REMAINS UNKNOWN', ...(brief.unknowns || []), '', 'NEXT STEP', brief.nextStep || '', '', 'SOURCES');
+  for (const [index, source] of sources.entries()) rows.push('[' + (index + 1) + '] ' + source.title + ' — ' + source.url);
+  rows.push('', 'Generated ' + date(brief.generatedAt), 'Soundings · Historical observations · Human review required');
+  const blob = new Blob([rows.join('\n')], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const link = make('a');
+  link.href = url;
+  link.download = 'soundings-' + String(brief.id).replace(/[^a-zA-Z0-9_-]/g, '') + '.txt';
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$('date-toggle').addEventListener('click', () => {
+  const expanded = $('date-toggle').getAttribute('aria-expanded') === 'true';
+  $('date-toggle').setAttribute('aria-expanded', String(!expanded));
+  $('date-filters').hidden = expanded;
+  $('date-toggle').lastElementChild.textContent = expanded ? '+' : '−';
+});
+$('help').addEventListener('click', () => $('about-dialog').showModal());
+$('close-help').addEventListener('click', () => $('about-dialog').close());

@@ -81,7 +81,10 @@ function assess(record) {
 
 export function listItem(record) {
   const { id, areaId, title, vessel, date, endDate, kind, location } = record;
-  return { id, areaId, title, vessel, date, endDate, kind, location, synthetic:false, priority:assess(record).priority };
+  const item = { id, areaId, title, vessel, date, endDate, kind, location, synthetic:false, priority:assess(record).priority };
+  if (record.evidenceType !== 'measured-gap') return { ...item, mapPoints: [] };
+  const { start, end, datasetHours, mapPoints } = record;
+  return { ...item, start, end, datasetHours, mapPoints: mapPoints.map(({ lon, lat, label }) => ({ lon, lat, label })) };
 }
 
 // The queue prioritises evidence reproducibility, not the probability of an offence.

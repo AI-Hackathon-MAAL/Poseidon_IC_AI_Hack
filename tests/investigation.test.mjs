@@ -50,6 +50,9 @@ test('HTTP workflow saves an independently readable brief and handles retries an
   const catalog = await (await fetch(url+'/api/catalog')).json();
   assert.equal(catalog.areas.length,3);
   assert.equal(catalog.origin,'Published replay');
+  assert.deepEqual(catalog.cases[0].mapPoints, replay[0].mapPoints);
+  assert.equal(catalog.cases[0].start, replay[0].start);
+  assert.deepEqual(catalog.cases.find(item => item.id === 'clarion-mar-2025').mapPoints, []);
   const post = caseId => fetch(url+'/api/investigate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({caseId})});
   assert.equal((await post('unknown')).status,404);
   const id = catalog.cases[0].id;

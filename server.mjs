@@ -7,7 +7,15 @@ import { areas, map, replay, listItem, rankCases, investigate, validCatalog } fr
 import { loadCandidates, recordBrief, readBrief } from './providers.mjs';
 
 const root = fileURLToPath(new URL('./', import.meta.url));
-const assets = new Map([['/',['index.html','text/html']],['/app.js',['app.js','text/javascript']],['/style.css',['style.css','text/css']]]);
+const assets = new Map([
+  ['/', ['index.html', 'text/html']],
+  ['/app.js', ['app.js', 'text/javascript']],
+  ['/style.css', ['style.css', 'text/css']],
+  ['/maritime-map.js', ['maritime-map.js', 'text/javascript']],
+  ['/maritime-map.css', ['maritime-map.css', 'text/css']],
+  ['/map-assets/earth-relief.webp', ['map-assets/earth-relief.webp', 'image/webp']],
+  ['/map-assets/pacific-relief.webp', ['map-assets/pacific-relief.webp', 'image/webp']]
+]);
 const json = (res,status,data) => res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify(data));
 
 async function body(req) {
@@ -55,7 +63,7 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
       if (req.method === 'GET' && assets.has(path)) {
         const [filename,type] = assets.get(path);
         const content = await readAsset(filename);
-        return res.writeHead(200,{'Content-Type':type+'; charset=utf-8'}).end(content);
+        return res.writeHead(200,{'Content-Type':type.startsWith('text/') ? type+'; charset=utf-8' : type}).end(content);
       }
       if (req.method === 'GET' && path === '/api/catalog') {
         const {records,origin} = await getCases();
