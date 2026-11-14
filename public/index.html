@@ -3,60 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080e16">
-  <title>Soundings — Maritime intelligence</title>
+  <meta name="theme-color" content="#171b20">
+  <title>Soundings — Protected waters, in view</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/maritime-map.css">
 </head>
 <body>
-  <a class="skip-link" href="#map-title">Skip to investigation</a>
+  <a class="skip-link" href="#investigate">Skip to selected case</a>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="Soundings home"><span class="brand-mark" aria-hidden="true">≋</span><span>SOUNDINGS</span></a>
-    <span class="product-label">MARITIME INTELLIGENCE</span>
+    <a class="brand" href="/" aria-label="Soundings home"><span class="brand-mark" aria-hidden="true">≋</span><span>Soundings</span></a>
+    <nav aria-label="Workspace"><button id="open-cases" type="button">Explore cases <span aria-hidden="true">↗</span></button><button id="help" type="button">About</button></nav>
     <div class="header-context"><span class="status-dot"></span><span id="data-mode">Connecting archive</span></div>
     <span class="timezone">UTC</span>
-    <button class="help-button" id="help" type="button" aria-label="About this workspace" title="About this workspace">?</button>
   </header>
   <main>
-    <div class="workspace-heading">
-      <div><p class="eyebrow">Operations / Protected waters</p><h1>Investigation workspace</h1></div>
-      <div class="workspace-context"><span class="archive-label">HISTORICAL REVIEW</span><span>Evidence-led maritime monitoring</span></div>
-    </div>
     <section class="desk" aria-label="Maritime investigation workspace">
-      <aside class="queue" aria-label="Case queue">
+      <div id="map" class="map" aria-label="Interactive globe and recorded vessel positions"></div>
+      <div class="editorial-heading"><p class="eyebrow">MARITIME INTELLIGENCE</p><h1>Soundings<span class="title-period">.</span></h1><p class="intro-copy">Investigate vessel activity<br>in protected waters.</p></div>
+      <aside class="queue" id="case-feed" aria-label="Case queue">
         <div class="panel-heading"><h2>Case queue</h2><span id="case-count" class="count">—</span></div>
-        <div class="queue-filters">
-          <label for="area">Protected area</label>
-          <select id="area"><option>Loading areas…</option></select>
-          <p id="area-summary" class="muted"></p>
-          <button id="date-toggle" class="filter-toggle" type="button" aria-expanded="false" aria-controls="date-filters"><span>Filter by date</span><span aria-hidden="true">+</span></button>
-          <div class="date-range" id="date-filters" hidden><div><label for="date-from">From</label><input type="date" id="date-from" value="2015-01-01"></div><div><label for="date-to">Through</label><input type="date" id="date-to" value="2025-12-31"></div></div>
-          <p id="filter-error" class="filter-error" role="status"></p>
-        </div>
-        <div class="queue-list-heading"><span>OBSERVATIONS</span><span>UTC</span></div>
+        <div class="queue-filters"><label class="sr-only" for="area">Protected area</label><select id="area"><option>Loading areas…</option></select><button id="date-toggle" class="filter-toggle" type="button" aria-expanded="false" aria-controls="date-filters" title="Filter by date"><span>Date</span><span aria-hidden="true">+</span></button><div class="date-range" id="date-filters" hidden><div><label for="date-from">From</label><input type="date" id="date-from" value="2015-01-01"></div><div><label for="date-to">Through</label><input type="date" id="date-to" value="2025-12-31"></div></div><p id="filter-error" class="filter-error" role="status"></p></div>
         <div id="cases" class="cases" aria-live="polite"><p class="queue-empty">Loading historical cases…</p></div>
-        <div class="queue-foot"><span class="status-dot"></span><span>Published records<br><small>Source periods vary by area</small></span></div>
+        <details class="queue-provenance"><summary>About these records</summary><p id="area-summary" class="muted"></p></details>
       </aside>
-      <section class="map-panel" aria-labelledby="map-title">
-        <div class="map-heading"><div><p class="eyebrow">Area of interest</p><h2 id="map-title">Protected waters</h2></div><span class="map-key"><i></i> Protected perimeter</span></div>
-        <div id="map" class="map" aria-label="Interactive geographic context"></div>
-        <div class="map-caption"><span id="map-caption">Loading geographic context…</span><a id="boundary-source" target="_blank" rel="noopener noreferrer"></a></div>
-        <section class="case-dossier" aria-label="Selected case">
-          <div class="selected"><div><p id="case-kind" class="eyebrow">Historical record</p><h3 id="case-title">Loading observations…</h3><p id="case-meta" class="muted">The selected case and its sources will appear here.</p></div><button id="investigate" class="primary-button" disabled>Investigate <span aria-hidden="true">↗</span></button></div>
-          <div id="case-facts" class="case-facts"></div>
-          <div class="activity-heading"><h3>Investigation activity</h3><span id="activity-state">Awaiting investigation</span></div>
-          <div id="status" role="status" class="status"></div>
-          <div id="timeline" class="timeline"><p class="activity-empty">Run the agent to check the event, vessel history and dated sources.</p></div>
-        </section>
-      </section>
-      <section class="brief-panel" aria-labelledby="brief-title">
-        <div class="panel-heading"><h2 id="brief-title">Evidence brief</h2><span id="priority" class="tag">Awaiting review</span></div>
-        <div id="brief" class="brief-empty"><div class="brief-glyph" aria-hidden="true"><span></span><span></span><span></span></div><p class="eyebrow">Your investigation starts here</p><h3>From observation<br>to an informed next step.</h3><p>Select a case and run the agent to assemble a cited brief.</p><div class="brief-checklist"><span>◇ <b>Check the event</b></span><span>◇ <b>Verify the context</b></span><span>◇ <b>Identify what to review</b></span></div></div>
-      </section>
+      <h2 id="map-title" class="sr-only">Protected waters</h2>
+      <section class="case-dossier" aria-label="Selected case"><div class="dossier-content"><p id="case-kind" class="eyebrow">Historical record</p><h3 id="case-title">Loading observations…</h3><p id="case-meta" class="muted">Select an observation to begin.</p><div id="case-facts" class="case-facts"></div></div><div class="case-actions"><button id="focus-area" type="button" class="secondary-button" disabled>Focus area <span aria-hidden="true">⌖</span></button><button id="investigate" class="primary-button" disabled>Investigate <span aria-hidden="true">↗</span></button><button id="open-brief" type="button" class="text-button" disabled>Open saved brief</button></div></section>
+      <div class="map-caption"><span class="map-key"><i></i> Protected perimeter</span><span id="map-caption">Loading geographic context…</span><a id="boundary-source" target="_blank" rel="noopener noreferrer"></a></div>
     </section>
-    <footer><span><span class="status-dot"></span> SOURCE-LED INVESTIGATIONS</span><span>Historical observations · Human review required</span><span id="footer-area">SOUNDINGS</span></footer>
+    <footer><span>Historical observations · Human review required</span><span id="footer-area">SOUNDINGS</span></footer>
   </main>
-  <dialog id="about-dialog"><div class="dialog-heading"><h2>About this workspace</h2><button id="close-help" class="help-button" type="button" aria-label="Close">×</button></div><p>Soundings helps analysts investigate historical vessel activity around marine protected areas. Select an area, choose an observation and run the agent to prepare a cited brief.</p><p>Priorities describe the next review action. Recorded positions and published reports supply the evidence. Vessel activity during a tracking gap remains unknown.</p><p class="muted">Use Tab to navigate controls. The map supports its own camera and layer controls. All event times use UTC.</p></dialog>
+  <dialog id="brief-dialog" class="evidence-drawer" aria-labelledby="brief-title"><div class="drawer-heading"><div><p class="eyebrow">INVESTIGATION</p><h2 id="brief-title">Evidence brief</h2></div><button id="close-brief" class="close-button" type="button" aria-label="Close evidence brief">×</button></div><div class="drawer-status"><span id="priority" class="tag">Awaiting review</span><span id="activity-state">Awaiting investigation</span></div><div id="status" role="status" class="status"></div><div id="brief" class="brief-empty"><h3>Investigating the observation.</h3><p>The agent’s findings and sources will appear here.</p></div><details class="activity-panel"><summary>Investigation activity</summary><div id="timeline" class="timeline"></div></details></dialog>
+  <dialog id="about-dialog" aria-labelledby="about-title"><div class="dialog-heading"><h2 id="about-title">About Soundings</h2><button id="close-help" class="close-button" type="button" aria-label="Close">×</button></div><p>Soundings helps analysts investigate historical vessel activity around marine protected areas. Choose an observation, explore its geographic context and run an investigation to assemble a cited evidence brief.</p><p>Priorities describe the next review action. Recorded positions and published reports supply the evidence. Vessel activity during a tracking gap remains unknown.</p><p class="muted">All event times use UTC. Use the map’s controls to explore the globe or focus on an area.</p></dialog>
   <script src="/maritime-map.js" defer></script>
   <script src="/app.js" defer></script>
 </body>

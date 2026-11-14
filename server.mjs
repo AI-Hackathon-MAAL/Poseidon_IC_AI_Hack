@@ -11,6 +11,8 @@ const assets = new Map([
   ['/', ['index.html', 'text/html']],
   ['/app.js', ['app.js', 'text/javascript']],
   ['/style.css', ['style.css', 'text/css']],
+  ['/fonts/inter-latin.woff2', ['fonts/inter-latin.woff2', 'font/woff2']],
+  ['/fonts/OFL.txt', ['fonts/OFL.txt', 'text/plain']],
   ['/maritime-map.js', ['maritime-map.js', 'text/javascript']],
   ['/maritime-map.css', ['maritime-map.css', 'text/css']],
   ['/map-assets/earth-relief.webp', ['map-assets/earth-relief.webp', 'image/webp']],

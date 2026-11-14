@@ -24,3 +24,40 @@
 .mar-sr {position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
 @media(max-width:540px){.mar-view{min-height:280px}.mar-location{display:none}.mar-tools button.mar-button{width:32px;min-height:32px}.mar-modes .mar-button{min-height:31px}}
 @media(prefers-reduced-motion:reduce){.mar-view button.mar-button{transition:none}}
+.mar-view {
+  --map-ink:#d6ddd7; --map-button:#141b1e; --map-border:#424b49;
+  background:radial-gradient(ellipse at 66% 43%,#151d20 0%,#11171a 39%,#0c1012 72%,#0a0d0f 100%);
+}
+.mar-view[data-mode=globe] .mar-stage::before {
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.28;
+  background-image:radial-gradient(circle, #65736c .6px, transparent .8px);
+  background-size:44px 44px;
+}
+.mar-modes,.mar-tools {border:1px solid var(--map-border);background:var(--map-button);border-radius:3px;box-shadow:0 2px 8px #080b0d55}
+.mar-modes {top:24px;right:24px;left:auto}
+.mar-tools {right:24px;top:83px}
+.mar-view button.mar-button {font-size:11px;padding:6px 11px;border-radius:1px;color:#bac4c0}
+.mar-view button.mar-button[aria-pressed=true] {color:#e8eeeb;background:#37413d}
+.mar-view button.mar-button:focus-visible,.mar-view button.mar-button:hover {outline-color:#a6bcb2;color:#fff;background:#2c3632}
+.mar-tools button.mar-button {width:31px;min-height:30px;padding:1px;font:400 20px/1 "Segoe UI",sans-serif}
+.mar-view button.mar-callout {
+  display:block;position:absolute;z-index:1;min-width:125px;min-height:0;padding:7px 11px 7px 10px;
+  border:1px solid #686d5b;border-left:2px solid #ded6a6;
+  border-radius:2px;color:#ebeee4;text-align:left;
+  background:linear-gradient(115deg,#242b25f5,#182022f5);box-shadow:0 4px 14px #060a0b45;
+}
+.mar-view button.mar-callout:hover,.mar-view button.mar-callout:focus-visible {background:#343e33;outline-color:#d5d5b2}
+.mar-view button.mar-callout[hidden] {display:none}
+.mar-callout-type {display:block;color:#b6b89f;font:8px/1.2 "IBM Plex Mono",Consolas,monospace;letter-spacing:.13em;text-transform:uppercase}
+.mar-callout-name {display:block;margin-top:3px;color:#f2f1df;font:600 13px/1.2 "Inter","Segoe UI",sans-serif;letter-spacing:.002em}
+.mar-stage:focus-visible {box-shadow:inset 0 0 0 2px #b4c5b8}
+.mar-readout {left:40px;bottom:12px}
+.mar-view a.mar-attribution {bottom:9px;right:24px;color:#99a8a5;background:#10171b95}
+.mar-view button.mar-locator {right:24px;bottom:49%;width:66px;height:66px;border-radius:50%;padding:0}
+@media(max-width:759px) {
+  .mar-modes {right:14px;top:14px}
+  .mar-tools {right:14px;top:72px}
+  .mar-readout {left:16px;bottom:10px}
+  .mar-view button.mar-locator {bottom:43px;right:14px}
+  .mar-view button.mar-callout {min-width:114px;padding:6px 8px}
+}

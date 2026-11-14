@@ -43,13 +43,13 @@ function mapData() {
   if (catalog.maps && typeof catalog.maps === 'object') return catalog.maps[$('area').value];
   return catalog.map?.areaId === $('area').value ? catalog.map : null;
 }
-function drawMap(points = []) {
+function drawMap(points = [], focusArea = false) {
   const map = mapData();
   const area = catalog.areas.find(area => area.id === $('area').value);
   if (window.SoundingsMap) {
     window.SoundingsMap.render($('map'), {
       area, map: map || null, points,
-      caseId: selected?.id, caseTitle: selected?.title
+      caseId: selected?.id, caseTitle: selected?.title, focusArea
     });
   } else {
     $('map').replaceChildren(make('p', 'Map unavailable. The case evidence remains available below.', 'queue-empty'));
@@ -85,25 +85,17 @@ function renderFacts(record) {
 function resetBrief(record) {
   $('priority').textContent = record ? 'Awaiting review' : 'No case selected';
   $('priority').removeAttribute('data-state');
+  $('open-brief').disabled = true;
   $('brief').className = 'brief-empty';
-  $('brief').replaceChildren();
-  const glyph = make('div', null, 'brief-glyph');
-  glyph.setAttribute('aria-hidden', 'true');
-  glyph.append(make('span'), make('span'), make('span'));
-  $('brief').append(glyph, make('p', 'Evidence-led investigation', 'eyebrow'),
-    make('h3', record ? 'What happened in these waters?' : 'Choose an observation.'),
-    make('p', record ? 'Run the agent to check the record, verify dated sources and identify the next review action.' : 'Select another area or expand the date range to find a case.'));
-  if (record) {
-    const checklist = make('div', null, 'brief-checklist');
-    for (const text of ['Check the event', 'Verify the context', 'Identify what to review']) {
-      const row = make('span', '◇');
-      row.append(make('b', text));
-      checklist.append(row);
-    }
-    $('brief').append(checklist);
-  }
+  $('brief').replaceChildren(
+    make('h3', record ? 'Reviewing the observation.' : 'Choose an observation.'),
+    make('p', record ? 'The agent’s findings and sources will appear here.' : 'Select another area or expand the date range to find a case.')
+  );
 }
-function selectCase(record) {
+function openEvidenceDrawer() {
+  if (!$('brief-dialog').open) $('brief-dialog').showModal();
+}
+function selectCase(record, focusArea = false) {
   if (running) return;
   selected = record;
   document.querySelectorAll('.case').forEach(button => {
@@ -122,7 +114,7 @@ function selectCase(record) {
   $('activity-state').textContent = 'Awaiting investigation';
   resetBrief(record);
   renderFacts(record);
-  drawMap(record.mapPoints || []);
+  drawMap(record.mapPoints || [], focusArea);
   const version = ++selectionVersion;
   fetch('/api/briefs/' + encodeURIComponent(record.id)).then(async response => {
     if (!response.ok) return;
@@ -156,7 +148,7 @@ function renderQueue() {
     button.dataset.id = String(record.id);
     button.append(make('span', record.synthetic ? 'Simulated control' : record.kind || 'Historical event', 'type'), make('strong', record.title || record.vessel), make('span', record.vessel, 'case-vessel'), make('small', casePeriod(record)));
     if (record.priority != null) button.append(make('span', record.priority, 'queue-priority'));
-    button.addEventListener('click', () => selectCase(record));
+    button.addEventListener('click', () => selectCase(record, true));
     $('cases').append(button);
   }
   if (cases.length) selectCase(cases[0]);else {
@@ -175,6 +167,7 @@ function renderQueue() {
   }
 }
 function renderBrief(brief) {
+  $('open-brief').disabled = false;
   $('brief').className = 'brief-body';
   $('brief').replaceChildren();
   $('priority').textContent = String(brief.priority || 'Review');
@@ -243,6 +236,8 @@ function renderBrief(brief) {
 $('investigate').addEventListener('click', async () => {
   if (!selected || running) return;
   running = true;
+  openEvidenceDrawer();
+  document.querySelector('.activity-panel').open = true;
   selectionVersion++;
   $('investigate').disabled = true;
   $('area').disabled = true;
@@ -302,6 +297,7 @@ async function initialize() {
       option.value = area.id;
       $('area').append(option);
     }
+    $('focus-area').disabled = false;
     renderQueue();
   } catch (error) {
     $('status').className = 'status error';
@@ -343,3 +339,14 @@ $('date-toggle').addEventListener('click', () => {
 });
 $('help').addEventListener('click', () => $('about-dialog').showModal());
 $('close-help').addEventListener('click', () => $('about-dialog').close());
+
+$('focus-area').addEventListener('click', () => {
+  if (window.SoundingsMap?.focusArea) window.SoundingsMap.focusArea($('map'));
+  else drawMap(selected?.mapPoints || [], true);
+});
+$('open-brief').addEventListener('click', openEvidenceDrawer);
+$('close-brief').addEventListener('click', () => $('brief-dialog').close());
+$('open-cases').addEventListener('click', () => {
+  $('case-feed').scrollIntoView({behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block:'start'});
+  $('area').focus({preventScroll:true});
+});

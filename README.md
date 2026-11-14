@@ -1,6 +1,6 @@
 # Soundings
 
-A historical case desk for marine conservation analysts. Select a protected area and a date range, investigate a lead, and inspect the map, dated observations, source links, evidence gaps and suggested follow-up. Saved briefs reopen when the case is selected again.
+A historical case desk for marine conservation analysts. The workspace opens on an interactive globe. Select a case and choose **Focus area** to inspect the recorded positions, or **Investigate** to open a cited evidence brief. Saved briefs are available from the selected case.
 
 ## Run locally
 
