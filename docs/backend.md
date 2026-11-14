@@ -12,6 +12,12 @@ Every case is a **lead for review, not proof**. Show `disclaimer` and `attributi
 
 Run `npm start` in this checkout and open `http://127.0.0.1:3000/`. The original Poseidon globe reads the notebook contract from `GET /api/snapshot`; old `/monitor` bookmarks lead to the same globe. Select an area and case, then **Open brief** to inspect the exported findings, sources, news and agent decisions in the evidence drawer. The bundled export contains 74 Galápagos cases and 19 Hermandad cases from three historical runs (14 November 2026 export). The page opens on the latest run’s area. A tracking gap is a gap in reception; transmitters classified as gear do not identify a fishing vessel. A browser refresh reads the latest export. In **Date**, filter by observation date or by the investigation's history/live mode. These controls select existing cases; use the notebook or a scheduled job to launch a new run. Published historical replays remain available at `/archive`.
 
+| Way | What you get | When to use |
+| --- | --- | --- |
+| `data/poseidon_snapshot.json` in GitHub | The latest real snapshot, committed from Databricks | Easiest for the front end: just pull the repo |
+| Snapshot file | One JSON document with everything | Simplest. Written on every run to `/Volumes/workspace/poseidon/exports/poseidon_snapshot.json` (download it from Catalog Explorer and bundle it with the app) |
+| Delta tables | `workspace.poseidon.*` (section 4) | A Databricks App, dashboard or Genie space reading live |
+
 **Use a local export.** Download `poseidon_snapshot.json` from the notebook's export volume. In PowerShell set `$env:POSEIDON_SNAPSHOT_PATH = 'C:/path/to/poseidon_snapshot.json'` before starting the server. An unavailable configured export returns HTTP 503. The server reports `X-Poseidon-Source: bundled-export` for the checked-in notebook output or `export` for a configured file or volume. Newer notebooks include explicit source flags. The bundled file predates those flags and is retained as supplied.
 
 **Use the monitor inside Databricks.**
@@ -135,7 +141,7 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 | Widget | Meaning |
 | --- | --- |
 | `mode` | `history` (uses `start_date`, `end_date`) or `live` (uses `lookback_days`, counted back from now) |
-| `mpa_ids` / `mpa_search` | Ids win; otherwise every area whose name contains the search text (accents ignored). `11753` = Galápagos Marine Reserve |
+| `mpa_ids` / `mpa_search` | Ids win (leave empty to use the search); otherwise every area whose name contains the search text (accents ignored). `11753` = Galápagos Marine Reserve |
 | `max_cases` | How many cases the agent investigates per run (highest priority first; the rest are `queued`) |
 | `max_steps` | Step budget per case |
 | `focus` | Comma-separated vessel names, ids or MMSIs to investigate first |
@@ -144,6 +150,8 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 | `search_provider` | `linkup`, `tavily` or `none` |
 | `llm_endpoint` | `auto` finds a working chat model in the workspace |
 | `catalog` / `schema` | Set the catalog and base schema. Sample runs use `<schema>_sample`. Normal reruns use stored case memory. |
+| `snapshot_scope` | `this_run_areas` (default): the snapshot only contains the areas of this run. `all_areas`: every area in the tables |
+| `snapshot_to_repo` | Also writes `data/poseidon_snapshot.json` into the Git folder, ready to commit and push |
 
 The unified notebook uses ordinary reruns to switch modes and sources. Older runs with no source label remain in storage. The monitor and case memory use source-tagged runs, so older cases are investigated again when selected. The case list shows the most recently stored investigation for each vessel and area. Its mapped events are the ones used in that investigation.
 

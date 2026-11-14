@@ -64,10 +64,12 @@ dbutils.widgets.dropdown("search_provider", "linkup", ["linkup", "tavily", "none
 dbutils.widgets.text("llm_endpoint", "auto")
 dbutils.widgets.text("catalog", "workspace")
 dbutils.widgets.text("schema", "poseidon")
+dbutils.widgets.dropdown("snapshot_to_repo", "true", ["true", "false"])
+dbutils.widgets.dropdown("snapshot_scope", "this_run_areas", ["this_run_areas", "all_areas"])
 
 W = {k: dbutils.widgets.get(k).strip() for k in
      ["mode", "start_date", "end_date", "lookback_days", "mpa_search", "mpa_ids", "max_cases", "max_steps", "focus",
-      "force_reinvestigate", "data_source", "search_provider", "llm_endpoint", "catalog", "schema"]}
+      "force_reinvestigate", "data_source", "search_provider", "llm_endpoint", "catalog", "schema", "snapshot_to_repo", "snapshot_scope"]}
 SAMPLE = W["data_source"] == "sample"
 CATALOG, SCHEMA = contract.storage_namespace(W["catalog"], W["schema"], W["data_source"])
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
@@ -289,9 +291,22 @@ save("mpa_status", contract.mpa_status_rows(all_cases, all_events))
 
 # COMMAND ----------
 
-snapshot = contract.build_snapshot(runs, all_cases, all_events, read_rows("agent_steps", source_run_ids),
-                                   read_rows("news", source_run_ids), read_rows("mpa_context", source_run_ids),
+# Keep the source-specific history, optionally narrowed to this run's protected areas.
+keep = {str(m["mpa_id"]) for m in mpas}
+def scoped(rows):
+    if W["snapshot_scope"] == "all_areas":
+        return rows
+    return [r for r in rows if str(r.get("mpa_id")) in keep]
+
+run_rows = runs if W["snapshot_scope"] == "all_areas" else [
+    r for r in runs if keep.intersection(map(str, contract.parse_row("runs", r).get("mpa_ids") or []))]
+case_rows = scoped(all_cases)
+case_ids = {c["case_id"] for c in case_rows}
+snapshot = contract.build_snapshot(run_rows, case_rows, scoped(all_events),
+                                   [s for s in read_rows("agent_steps", source_run_ids) if s.get("case_id") in case_ids],
+                                   scoped(read_rows("news", source_run_ids)), scoped(read_rows("mpa_context", source_run_ids)),
                                    datetime.now(timezone.utc).isoformat(timespec="seconds"))
+print("Snapshot covers:", ", ".join(m["mpa_name"] for m in snapshot["mpas"]) or "no areas yet")
 snapshot_json = json.dumps(snapshot, default=str, ensure_ascii=False, indent=1)
 try:
     spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.exports")
@@ -301,6 +316,16 @@ try:
     print(f"Snapshot written: {path}  ({len(snapshot_json) // 1024} KB, {len(snapshot['cases'])} cases)")
 except Exception as e:
     print(f"Could not write the snapshot file ({str(e)[:200]}). The tables are still up to date.")
+
+if W["snapshot_to_repo"] == "true":
+    # Copy into this Git folder so it can be committed and pushed for the front end
+    repo_file = repo / "data" / ("poseidon_snapshot.sample.json" if SAMPLE else "poseidon_snapshot.json")
+    try:
+        repo_file.write_text(snapshot_json, encoding="utf-8")
+        print(f"Snapshot copied into the Git folder: {repo_file}")
+        print("To share it: click the branch name (main) at the top -> tick this file -> Commit & Push.")
+    except Exception as e:
+        print(f"Could not copy the snapshot into the Git folder ({str(e)[:200]}).")
 
 # COMMAND ----------
 
