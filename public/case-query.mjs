@@ -54,3 +54,87 @@ export function contextPoints(records) {
     ...point, caseId: record.id, areaId: record.areaId, riskLevel: record.snapshotCase?.risk_level || 'unknown'
   })));
 }
+
+function identity(record) {
+  const row = record.snapshotCase || {};
+  const id = String(row.vessel_id ?? '').trim();
+  const mmsi = String(row.mmsi ?? '').trim();
+  return {
+    id: /^(?:none|null|unknown|n\/a|0)?$/i.test(id) ? '' : id,
+    mmsi: /^\d{9}$/.test(mmsi) && mmsi !== '000000000' ? mmsi : '',
+    gear: String(record.vesselType || row.vessel_type || '').toLowerCase() === 'gear'
+  };
+}
+
+function observationOrder(a, b) {
+  const dateA = Date.parse(a.markerTime), dateB = Date.parse(b.markerTime);
+  const timeA = Number.isFinite(dateA) ? dateA : -Infinity;
+  const timeB = Number.isFinite(dateB) ? dateB : -Infinity;
+  if (timeA !== timeB) return timeA > timeB ? -1 : 1;
+  const fields = ['eventId', 'eventType', 'role', 'caseId', 'lat', 'lon', 'label'];
+  for (const field of fields) {
+    const left = String(a[field] ?? ''), right = String(b[field] ?? '');
+    if (left !== right) return left < right ? -1 : 1;
+  }
+  return 0;
+}
+
+/** Keep GFW identities separate even when an MMSI is reused by several tracked objects. */
+export function groupVessels(cases, positions = contextPoints(cases), identityCases = cases) {
+  const lookup = new Map();
+  const idsByMmsi = new Map();
+  for (const record of identityCases) {
+    const ref = identity(record);
+    lookup.set(record.id, ref);
+    if (ref.id && ref.mmsi) {
+      if (!idsByMmsi.has(ref.mmsi)) idsByMmsi.set(ref.mmsi, new Set());
+      idsByMmsi.get(ref.mmsi).add(ref.id);
+    }
+  }
+
+  const groups = new Map(), groupByCase = new Map();
+  for (const record of cases) {
+    const {id, mmsi, gear} = lookup.get(record.id) || identity(record);
+    const matches = idsByMmsi.get(mmsi);
+    const resolvedId = id || (matches?.size === 1 ? [...matches][0] : '');
+    let vesselKey = 'case:' + record.id;
+    if (resolvedId) vesselKey = 'vessel:' + resolvedId;
+    else if (mmsi && !matches?.size) vesselKey = 'mmsi:' + mmsi;
+    if (!groups.has(vesselKey)) {
+      groups.set(vesselKey, {vesselKey, vesselName:'', vesselType:'', isGear:false, cases:[], points:[], anchor:null});
+    }
+    const group = groups.get(vesselKey);
+    group.cases.push(record);
+    group.isGear ||= gear;
+    groupByCase.set(record.id, group);
+  }
+  for (const point of positions) {
+    const group = groupByCase.get(point.caseId);
+    if (!group || !Number.isFinite(point.lon) || Math.abs(point.lon) > 180 ||
+        !Number.isFinite(point.lat) || Math.abs(point.lat) > 90) continue;
+    const markerTime = point.markerTime || (point.role === 'gap-end' ? point.endTime : point.startTime);
+    group.points.push({...point, markerTime, vesselKey:group.vesselKey});
+  }
+  for (const group of groups.values()) {
+    group.points.sort(observationOrder);
+    const seen = new Set();
+    group.points = group.points.filter(point => {
+      if (point.eventId == null || point.eventId === '') return true;
+      const identity = JSON.stringify([point.eventType,point.eventId,point.role]);
+      if (seen.has(identity)) return false;
+      seen.add(identity);
+      return true;
+    });
+    group.anchor = group.points.find(point => Number.isFinite(Date.parse(point.markerTime))) || null;
+    const latestCase = group.cases.find(record => record.id === group.anchor?.caseId) || group.cases[0];
+    const records = [latestCase, ...group.cases.filter(record => record !== latestCase)];
+    const named = records.find(record => record.vessel && !/^(?:unidentified\b|mmsi\s)/i.test(record.vessel));
+    group.vesselName = named?.vessel || latestCase.vessel || (group.isGear ? 'Unidentified gear' : 'Unidentified vessel');
+    group.vesselType = group.isGear ? 'gear' : records.find(record => record.vesselType)?.vesselType || '';
+    for (const point of group.points) {
+      point.vesselName = group.vesselName;
+      point.vesselType = group.vesselType;
+    }
+  }
+  return [...groups.values()];
+}

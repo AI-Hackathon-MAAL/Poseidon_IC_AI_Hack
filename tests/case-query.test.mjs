@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {snapshotCatalog} from '../public/snapshot-workspace.mjs';
-import {queryCases, queueStats, contextPoints} from '../public/case-query.mjs';
+import {queryCases, queueStats, contextPoints, groupVessels} from '../public/case-query.mjs';
 
 const event = (id, type, start, lat = 0) => ({event_id: id, event_type: type, start_time: start, lat, lon: 0});
 const catalog = snapshotCatalog({
@@ -55,4 +55,44 @@ test('co-located fishing and reporting gap observations retain their distinct ti
   assert.equal(points[0].lon, points[1].lon);
   assert.equal(points[2].startTime, events[1].start_time);
   assert.equal(points[2].endTime, events[1].end_time);
+});
+
+test('vessel histories span areas, deduplicate repeated endpoints, and choose the newest valid dated anchor', () => {
+  const cases = snapshotCatalog({mpas:[],cases:[
+    {case_id:'west',mpa_id:'w',vessel_id:'id-7',vessel_name:'Fleur',mmsi:'001234567',vessel_type:'fishing'},
+    {case_id:'east',mpa_id:'e',mmsi:'001234567',vessel_type:'fishing'},
+    {case_id:'other',mpa_id:'e',vessel_id:'id-8',vessel_type:'gear',vessel_name:'Fleur'}
+  ]},'export').cases;
+  const base = {caseId:'west',lat:1,lon:2,eventId:'g', eventType:'gap',role:'gap-start',markerTime:'2026-01-01T04:00:00Z'};
+  const points = [base,{...base,caseId:'east'},
+    {...base,role:'gap-end',markerTime:'2026-01-02T04:00:00Z'},
+    {...base,eventId:'before',markerTime:'2025-12-15T04:00:00Z'},
+    {...base,eventId:'bad',lat:120,markerTime:'2030-01-01T00:00:00Z'},
+    {...base,eventId:undefined,markerTime:undefined},
+    {...base,caseId:'other',markerTime:'unknown'}];
+  const [vessel,gear] = groupVessels(cases,points);
+  assert.deepEqual(vessel.cases.map(c=>c.id),['west','east']);
+  assert.equal(vessel.vesselKey,'vessel:id-7');
+  assert.equal(vessel.vesselName,'Fleur');
+  assert.deepEqual(vessel.points.map(p=>p.eventId),['g','g','before',undefined]);
+  assert.equal(vessel.anchor.role,'gap-end');
+  assert.ok(vessel.points.every(p=>p.vesselType==='fishing' && p.vesselName==='Fleur' && p.vesselKey===vessel.vesselKey));
+  assert.deepEqual(groupVessels(cases,[...points].reverse())[0].points,vessel.points);
+  assert.equal(gear.isGear,true);
+  assert.equal(gear.vesselKey,'vessel:id-8');
+  assert.equal(gear.anchor,null);
+  assert.equal(groupVessels([cases[1]],points,cases)[0].vesselKey,vessel.vesselKey);
+});
+
+test('reused MMSIs and matching display names cannot collapse different GFW identities', () => {
+  const cases = snapshotCatalog({mpas:[],cases:[
+    {case_id:'a',mpa_id:'1',vessel_id:'id-a',mmsi:'345678901'},
+    {case_id:'b',mpa_id:'2',vessel_id:'id-b',mmsi:'345678901'},
+    {case_id:'ambiguous',mpa_id:'3',mmsi:'345678901'},
+    {case_id:'unnamed1',mpa_id:'4',vessel_name:'Same Name'},
+    {case_id:'unnamed2',mpa_id:'5',vessel_name:'Same Name'}
+  ]},'export').cases;
+  assert.deepEqual(groupVessels(cases,[]).map(g=>g.vesselKey),
+    ['vessel:id-a','vessel:id-b','case:ambiguous','case:unnamed1','case:unnamed2']);
+  assert.equal(groupVessels([cases[2]],[],cases)[0].vesselKey,'case:ambiguous');
 });

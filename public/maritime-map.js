@@ -64,7 +64,7 @@
     }
     return ['#abcde5', 'rgba(171,205,229,.45)'];
   }
-  function fit(data, width, height, positions) {
+  function fit(data, width, height, positions, minimumSpan=12) {
     const points = [...positions];
     if (validBounds(data.map)) {
       const [w,s,e,n] = data.map.bounds;
@@ -85,18 +85,18 @@
     let south=90,north=-90;
     for(const p of points){south=Math.min(south,p.lat);north=Math.max(north,p.lat);}
     const lat = (south + north) / 2, aspect = width / Math.max(1,height);
-    const span = Math.max(12, (east-west)*Math.cos(lat*DEG)*1.65, (north-south)*aspect*1.6);
-    return {lon:wrap((west+east)/2),lat,span:clamp(span,8,155)};
+    const span = Math.max(minimumSpan, (east-west)*Math.cos(lat*DEG)*1.65, (north-south)*aspect*1.6);
+    return {lon:wrap((west+east)/2),lat,span:Math.min(span,155)};
   }
   function camera(view,w,h,mini=false) {
     const globe = view.mode === 'globe';
-    const tilt = globe ? 0 : Math.min(24, Math.max(0, 80 - Math.abs(view.lat)));
+    const tilt = view.tilt ?? (globe ? 0 : Math.min(24, Math.max(0, 80 - Math.abs(view.lat))));
     const origin = clamp(view.lat - tilt, -89.95,89.95)*DEG;
     const desktop = w>=760 && !mini;
     const regionWidth = desktop ? Math.max(w*.54,w-500) : w*.95;
-    const radius = globe ? (mini ? w*.435 :
+    const radius = view.radius ?? (globe ? (mini ? w*.435 :
       desktop ? Math.min(w*.35,h*.435) : Math.min(w*.49,h*.32))*view.mag :
-      regionWidth/(2*Math.sin(clamp(view.span/2,.45,79)*DEG));
+      regionWidth/(2*Math.sin(clamp(view.span/2,.45,79)*DEG)));
     const sin = Math.sin(origin), cos = Math.cos(origin);
     const cx = w*(mini?.5:desktop?.655:.5);
     const cy = h*(mini?.505:desktop?.435:.58) + radius*Math.sin(tilt*DEG);
@@ -106,13 +106,13 @@
       const z = sin*sphi + cos*cphi*Math.cos(dlon);
       return {x:cx+radius*cphi*Math.sin(dlon),y:cy-radius*(cos*sphi-sin*cphi*Math.cos(dlon)),z};
     }
-    return {radius,cx,cy,sin,cos,w,h,project,lon:view.lon};
+    return {radius,cx,cy,sin,cos,w,h,project,lon:view.lon,lat:view.lat,tilt};
   }
   function coord(n,latitude=false,decimals=2) {
     return Math.abs(n).toFixed(decimals) + '°' + (latitude ? (n<0?'S':'N') : (n<0?'W':'E'));
   }
   function screenTexture(canvas,cam,world,pacific,dragging) {
-    const ratio = cam.w<=80?1:Math.min(window.devicePixelRatio||1, (dragging ? 520 : 1400)/cam.w);
+    const ratio = cam.w<=80?1:Math.min(window.devicePixelRatio||1, (dragging ? 440 : 1400)/cam.w);
     const width = Math.max(1,Math.round(cam.w*ratio)), height = Math.max(1,Math.round(cam.h*ratio));
     if(canvas.width !== width || canvas.height !== height) { canvas.width=width;canvas.height=height; }
     const ctx = canvas.getContext('2d');
@@ -233,6 +233,13 @@
     }
     return groups;
   }
+  function vesselLabel(point) {
+    return point.vesselName || (point.mmsi ? 'MMSI '+point.mmsi : 'Unidentified contact');
+  }
+  function cameraScope(points) {
+    // Queue order, source text and object references do not affect the camera's extent.
+    return [...new Set(points.map(p=>p.lon+','+p.lat))].sort();
+  }
   function create(container) {
     const root=el('div','mar-view'), terrain=el('canvas','mar-raster'), overlay=el('canvas','mar-overlay');
     const stage=el('div','mar-stage');
@@ -255,58 +262,149 @@
     const calloutName=el('span','mar-callout-name');
     regionCallout.append(calloutType,calloutName);
     const locator=button('Open globe at this map location','',()=>{
+      if(data.vesselMode){openGlobe();return;}
       view={...view,mode:'globe',mag:1};dirty();
     });
     locator.classList.add('mar-locator');
     const locatorCanvas=el('canvas','mar-locator-raster');
     locatorCanvas.setAttribute('aria-hidden','true');locator.append(locatorCanvas);
     const textureState=el('div','mar-texture-state');
-    readout.append(scale,location);root.append(stage,regionCallout,modes,tools,locator,readout,attribution,sr,textureState);container.replaceChildren(root);
+    const chooser=el('section','mar-picker');
+    chooser.hidden=true;chooser.setAttribute('aria-label','Nearby contacts');
+    readout.append(scale,location);root.append(stage,regionCallout,modes,tools,locator,readout,attribution,sr,textureState,chooser);container.replaceChildren(root);
 
     let data={points:[],contextPoints:[]}, view={mode:'globe',lon:-108,lat:20,span:25,mag:1};
     let frame=0,drag=null,width=1,height=1,world=null,pacific=null,signature='';
-    let focusedCase=false,ignorePointerClick=false;
+    let focusedCase=false,ignorePointerClick=false,flight=null,lastCamera=null,rasterKey='',pickerOwner=null;
+    const reduceMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const markerButtons=[];
-    function reset(mode='area', focusCase=false) {
+    function closeChooser(restore=false){
+      if(chooser.hidden)return;
+      chooser.hidden=true;
+      if(restore)pickerOwner?.focus({preventScroll:true});
+      pickerOwner=null;
+    }
+    function placePicker(group,owner,first){
+      pickerOwner=owner;chooser.hidden=false;
+      chooser.style.left=clamp(group.x+18,8,Math.max(8,width-chooser.offsetWidth-8))+'px';
+      chooser.style.top=clamp(group.y-chooser.offsetHeight/2,8,Math.max(8,height-chooser.offsetHeight-8))+'px';
+      first?.focus({preventScroll:true});
+    }
+    function showContacts(group,owner){
+      closeChooser();chooser.setAttribute('aria-label','Nearby contacts');
+      const heading=el('div','mar-picker-head');
+      heading.append(el('strong','',group.points.length+' nearby contacts'),
+        button('Close nearby contacts','×',()=>closeChooser(true)));
+      const list=el('div','mar-picker-list');
+      const search=el('input','mar-picker-search');
+      search.type='search';search.placeholder='Find a vessel or gear';search.setAttribute('aria-label','Filter nearby contacts');
+      const sorted=group.points.slice().sort((a,b)=>vesselLabel(a).localeCompare(vesselLabel(b)));
+      function drawChoices(){
+        const query=(search.value||'').trim().toLowerCase();
+        list.replaceChildren();
+        for(const point of sorted){
+          const name=vesselLabel(point),type=point.vesselType==='gear'?'Gear':'Vessel';
+          if(![name,type,point.mmsi].filter(Boolean).join(' ').toLowerCase().includes(query))continue;
+          const item=el('button','mar-picker-item');item.type='button';
+          item.append(el('span','',name),el('small','',type));
+          item.addEventListener('click',()=>{closeChooser();data.onSelectVessel?.(point.vesselKey,point,group.points);});
+          list.append(item);
+        }
+        if(!list.children.length)list.append(el('p','mar-picker-empty','No matching contacts.'));
+      }
+      search.addEventListener('input',drawChoices);
+      chooser.replaceChildren(heading);if(sorted.length>6)chooser.append(search);
+      chooser.append(list);drawChoices();
+      placePicker(group,owner,sorted.length>6?search:list.firstElementChild);
+    }
+    function showHistory(group,owner){
+      closeChooser();
+      chooser.setAttribute('aria-label','Nearby recorded positions');
+      const heading=el('div','mar-picker-head');
+      heading.append(el('strong','','Recorded positions'),button('Close recorded positions','×',()=>closeChooser(true)));
+      const list=el('div','mar-picker-list');
+      for(const point of group.points){
+        const item=el('button','mar-picker-item mar-history-item');item.type='button';
+        const latest=samePosition(point,data.vesselAnchor);
+        const timestamp=Date.parse(point.markerTime);
+        item.append(el('span','',(latest?'Latest · ':'')+(point.label||'Recorded position')),
+          el('small','',Number.isFinite(timestamp)?new Date(timestamp).toISOString().slice(0,16).replace('T',' ')+' UTC':'Time unavailable'));
+        item.addEventListener('click',()=>{closeChooser();data.onSelectObservation?.(point,group.points);});
+        list.append(item);
+      }
+      chooser.replaceChildren(heading,list);
+      placePicker(group,owner,list.firstElementChild);
+    }
+    chooser.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeChooser(true);}});
+    root.addEventListener('focusout',e=>{if(!chooser.hidden && e.relatedTarget && !chooser.contains(e.relatedTarget))closeChooser();});
+    function reset(mode='area', focusCase=false, animate=false, fitHistory=false) {
+      closeChooser();
       focusedCase=focusCase;
       const overview=!focusCase && data.contextPoints.length>0;
-      const point=focusCase && validLocation(data.focusPoint) ? data.focusPoint : null;
+      const point=focusCase && !fitHistory && validLocation(data.focusPoint) ? data.focusPoint : null;
       const home=point ? {lon:point.lon,lat:point.lat,span:2.8} :
-        fit(data,width,height,overview ? data.contextPoints : data.points);
+        fit(data,width,height,overview && !data.historyMode ? data.contextPoints : data.points,data.historyMode?2.8:12);
       view={mode,lon:home.lon,lat:home.lat,span:home.span,mag:1};
       if(mode==='globe'&&!overview){
         // Frame the park beside the North American coastline on the opening hemisphere.
         if(data.area?.id==='revillagigedo'){view.lon=-111;view.lat=20;}
         else {view.lon=wrap(home.lon+6);view.lat=clamp(home.lat+6,-80,80);}
       }
+      const targetCam=camera(view,width,height);
+      const moved=lastCamera && (Math.abs(lastCamera.radius-targetCam.radius)>.5 ||
+        Math.abs(wrap(lastCamera.lon-view.lon))>.01 || Math.abs(lastCamera.lat-view.lat)>.01);
+      flight=animate && moved && !reduceMotion?.matches
+        ? {from:lastCamera,start:performance.now(),duration:480} : null;
       dirty();
     }
+    function openGlobe(){
+      if(data.vesselMode && data.onOverview){
+        if(!data.historyMode)reset('globe',false,true);
+        data.onOverview();
+      }else reset('globe',false,true);
+    }
     function zoom(direction) {
+      closeChooser();flight=null;
       if(view.mode==='globe') view.mag=clamp(view.mag*Math.pow(1.35,direction),.65,4);
       else view.span=clamp(view.span*Math.pow(.72,direction),1.3,150);
       dirty();
     }
-    const areaBtn=button('Fit map to the selected area','Area',()=>reset('area'));
-    const globeBtn=button('Show the 3D globe','Globe',()=>reset('globe'));
+    const areaBtn=button('Fit map to the selected area','Area',()=>reset('area',false,true));
+    const globeBtn=button('Show the 3D globe','Globe',openGlobe);
     modes.append(globeBtn,areaBtn);
-    tools.append(button('Zoom in','+',()=>zoom(1)),button('Zoom out','−',()=>zoom(-1)),button('Reset map view','⌖',()=>reset(view.mode)));
+    tools.append(button('Zoom in','+',()=>zoom(1)),button('Zoom out','−',()=>zoom(-1)),button('Reset map view','⌖',()=>data.vesselMode?openGlobe():reset(view.mode)));
     function dirty(){if(!frame)frame=requestAnimationFrame(paint);}
     function paint() {
       frame=0;
       if(width<2||height<2)return;
-      const cam=camera(view,width,height);
+      let cam=camera(view,width,height);
+      if(flight){
+        const progress=clamp((performance.now()-flight.start)/flight.duration,0,1);
+        const t=progress*progress*(3-2*progress),from=flight.from;
+        if(progress<1){
+          cam=camera({...view,lon:wrap(from.lon+wrap(view.lon-from.lon)*t),
+            lat:from.lat+(view.lat-from.lat)*t, tilt:from.tilt+(cam.tilt-from.tilt)*t,
+            radius:from.radius*Math.pow(cam.radius/from.radius,t)},width,height);
+          dirty();
+        }else flight=null;
+      }
+      lastCamera=cam;
       root.dataset.mode=view.mode;
-      screenTexture(terrain,cam,world,pacific,Boolean(drag));
+      const moving=Boolean(drag||flight);
+      const key=[width,height,cam.lon,cam.lat,cam.tilt,cam.radius,moving,Boolean(world),Boolean(pacific)].join('|');
+      if(key!==rasterKey){screenTexture(terrain,cam,world,pacific,moving);rasterKey=key;}
       const dpr=Math.min(devicePixelRatio||1,2);
       const cw=Math.round(width*dpr),ch=Math.round(height*dpr);
       if(overlay.width!==cw||overlay.height!==ch){overlay.width=cw;overlay.height=ch;}
       const ctx=overlay.getContext('2d'); if(!ctx)return;
       ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
-      grid(ctx,cam,view);perimeter(ctx,cam,data.map);
+      // At zoomed levels a one-degree graticule has thousands of projected segments.
+      grid(ctx,cam,moving && view.mode==='area' ? {...view,span:Math.max(16,view.span)} : view);
+      perimeter(ctx,cam,data.map);
       drawContext(ctx,cam);
       drawLabels(ctx,cam);
       locator.hidden=view.mode==='globe'||width<410||height<265;
-      if(!locator.hidden){
+      if(!locator.hidden && !moving){
         const side=80;
         const small=camera({...view,mode:'globe',mag:1.12},side,side,true);
         screenTexture(locatorCanvas,small,world,null,false);
@@ -334,7 +432,7 @@
       location.textContent=coord(view.lat,true)+'  '+coord(view.lon);
     }
     function drawContext(ctx,cam) {
-      if(!data.onSelectCase && data.contextPoints.length){
+      if(!data.vesselMode && !data.onSelectCase && data.contextPoints.length){
         ctx.beginPath();
         for(const point of data.contextPoints){
           const p=cam.project(point.lon,point.lat);
@@ -345,6 +443,7 @@
       }
       // Put the selected observation first so its local marker stays precisely on its coordinate.
       const groups=groupPositions(data.markerPoints||[],cam,data.focusPoint);
+      const ships=data.vesselMode && !data.historyMode;
       for(let i=0;i<groups.length;i++) {
         const group=groups[i], count=group.points.length, point=group.representative;
         let btn=markerButtons[i];
@@ -354,7 +453,15 @@
           btn.addEventListener('click',event=>{
             if(event.detail && ignorePointerClick)return;
             const target=btn.group;
-            if(target)data.onSelectCase?.(target.representative.caseId,target.representative,target.points);
+            if(!target)return;
+            const anchor=target.representative;
+            if(data.vesselMode && !data.historyMode){
+              if(target.points.length>1)showContacts(target,btn);
+              else data.onSelectVessel?.(anchor.vesselKey,anchor,target.points);
+            }else if(data.vesselMode){
+              if(target.points.length>1)showHistory(target,btn);
+              else data.onSelectObservation?.(anchor,target.points);
+            }else data.onSelectCase?.(anchor.caseId,anchor,target.points);
           });
           observationLayer.append(btn);markerButtons.push(btn);
         }
@@ -362,12 +469,19 @@
         btn.dataset.cluster=String(count>1);
         btn.dataset.focused=String(Boolean(group.focused));
         btn.dataset.role=point.role||'event';
+        const latest=data.historyMode && samePosition(point,data.vesselAnchor);
+        btn.dataset.latest=String(Boolean(latest));
+        btn.dataset.glyph=latest?(point.vesselType==='gear'?'gear':'ship'):
+          ships?(group.points.every(p=>p.vesselType==='gear')?'gear':
+          group.points.every(p=>p.vesselType!=='gear')?'ship':'contacts'):'observation';
         btn.style.left=group.x+'px';btn.style.top=group.y+'px';
-        const name=count>1?'Explore '+count+' recorded positions':
+        const name=latest ? (count>1?'Latest position of '+vesselLabel(point)+' and '+(count-1)+' nearby recorded '+(count===2?'position':'positions'):'Open latest position of '+vesselLabel(point)) :
+          ships ? (count>1?'Choose from '+count+' nearby contacts':'Open '+vesselLabel(point)) :
+          count>1?'Explore '+count+' recorded positions':
           'Open '+(point.label||'recorded position');
         const label=name+' near '+coord(point.lat,true)+', '+coord(point.lon);
         btn.setAttribute('aria-label',label);btn.title=label;
-        btn.textContent=count>1 ? String(count) : '';
+        btn.textContent=!ships && !latest && count>1 ? String(count) : '';
       }
       while(markerButtons.length>groups.length)markerButtons.pop().remove();
     }
@@ -459,23 +573,39 @@
     function update(next) {
       const points=(next.points||[]).filter(validLocation);
       const contextPoints=(next.contextPoints||[]).filter(validLocation);
-      const contextChanged=next.contextPoints!==data.contextPointsInput;
-      const key=JSON.stringify([next.area?.id,next.area?.center,next.caseId,next.map?.bounds,points]);
-      let markerPoints=typeof next.onSelectCase==='function' ? contextPoints.filter(p=>p.caseId!=null) : [];
+      const wasVessel=Boolean(data.vesselMode);
+      const historyMode=Boolean(next.vesselMode && !next.overview && (next.activeVesselKey||next.caseId||next.historyPoints?.length||next.focusPoint));
+      const vesselAnchor=historyMode ? (next.vesselAnchor || contextPoints.find(p=>p.vesselKey===(next.activeVesselKey||next.caseId))) : null;
+      let markerPoints=next.vesselMode ? (historyMode ? (next.historyPoints||points).filter(validLocation) :
+        contextPoints.filter(p=>p.vesselKey!=null)) : (typeof next.onSelectCase==='function' ? contextPoints.filter(p=>p.caseId!=null) : []);
       if(validLocation(next.focusPoint)){
+        markerPoints=markerPoints.slice();
         const index=markerPoints.findIndex(p=>samePosition(p,next.focusPoint));
         if(index>0)markerPoints.unshift(...markerPoints.splice(index,1));
       }
-      data={...next,points,contextPoints,markerPoints,contextPointsInput:next.contextPoints};
-      const scope=Array.isArray(next.contextPoints)?contextPoints.length+' recorded positions in this selection. ':'';
-      const fitLabel=contextPoints.length?'Fit map to filtered observations':'Fit map to the selected area';
+      if(validLocation(vesselAnchor)){
+        // Project the vessel glyph at its exact published anchor even if earlier events overlap it.
+        const index=markerPoints.findIndex(p=>samePosition(p,vesselAnchor));
+        if(index>=0)markerPoints.splice(index,1);
+        markerPoints.unshift(vesselAnchor);
+      }
+      const extent=next.vesselMode ? markerPoints : [...points,...contextPoints];
+      const key=JSON.stringify([next.area?.id,next.area?.center,next.activeVesselKey||next.caseId,next.map?.bounds,cameraScope(extent)]);
+      const wasHistory=Boolean(data.historyMode);
+      data={...next,points,contextPoints,markerPoints,historyMode,vesselAnchor};
+      const scope=next.vesselMode ? (historyMode?markerPoints.length+' positions for this contact. ':
+        contextPoints.length+' contacts with a reported position. ') :
+        (Array.isArray(next.contextPoints)?contextPoints.length+' recorded positions in this selection. ':'');
+      observationLayer.setAttribute('aria-label',next.vesselMode&&!historyMode?'Vessel and gear markers':'Recorded observation markers');
+      const fitLabel=historyMode?'Fit map to vessel history':contextPoints.length?'Fit map to filtered positions':'Fit map to the selected area';
       areaBtn.setAttribute('aria-label',fitLabel);areaBtn.title=fitLabel;
       sr.textContent=(next.area?.name||'World')+'. '+scope+(points.length?points.map(p=>(p.label||'Observed position')+' '+coord(p.lat,true)+', '+coord(p.lon)).join('. '):'No selected positions.')+
         (validBounds(data.map)?' Verified perimeter displayed.':' Verified perimeter unavailable.');
-      if(next.overview){signature=key;reset('globe');}
+      if(next.overview && (wasHistory || !signature || key!==signature)){signature=key;reset('globe',false,wasHistory);}
+      else if(next.fitHistory && historyMode){signature=key;reset('area',true,wasVessel,true);}
       else if(!signature){signature=key;reset(next.focusArea?'area':'globe',Boolean(next.focusArea));}
-      else if(next.focusArea){signature=key;reset('area',true);}
-      else if(key!==signature||contextChanged){signature=key;reset(view.mode);}
+      else if(next.focusArea){signature=key;reset('area',true,wasVessel);}
+      else if(key!==signature){signature=key;reset(view.mode);}
       else dirty();
     }
     function resize() {
@@ -486,6 +616,7 @@
     }
     stage.addEventListener('pointerdown',e=>{
       if(e.button!==0||drag)return;
+      closeChooser();flight=null;
       ignorePointerClick=false;
       if(!e.target.closest('.mar-marker'))stage.focus({preventScroll:true});
       drag={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};
@@ -510,6 +641,8 @@
     }
     stage.addEventListener('pointerup',release);stage.addEventListener('pointercancel',release);stage.addEventListener('lostpointercapture',release);
     stage.addEventListener('keydown',e=>{
+      if(e.target!==stage && !e.key.startsWith('Arrow'))return;
+      if(flight)flight=null;
       const movement=view.mode==='globe'?10/view.mag:view.span/12;
       if(e.key==='ArrowLeft')view.lon=wrap(view.lon-movement);
       else if(e.key==='ArrowRight')view.lon=wrap(view.lon+movement);
@@ -517,7 +650,7 @@
       else if(e.key==='ArrowDown')view.lat=clamp(view.lat-movement,-86,86);
       else if(e.key==='+'||e.key==='=')zoom(1);
       else if(e.key==='-')zoom(-1);
-      else if(e.key==='Home')reset(view.mode);
+      else if(e.key==='Home'){if(data.vesselMode)openGlobe();else reset(view.mode);}
       else return;
       e.preventDefault();dirty();
     });
