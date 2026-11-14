@@ -73,11 +73,21 @@ mpa_rows = [
 print(f"{len(mpa_rows)} MPAs; example record keys: {list(mpa_records[0].keys()) if mpa_records else []}")
 spark.createDataFrame(mpa_rows).write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(f"{CATALOG}.{SCHEMA}.mpas")
 
-search = fold(dbutils.widgets.get("mpa_search").strip()).replace("'", "")
-if search:
-    display(spark.sql(f"SELECT mpa_id, mpa_name, raw FROM {CATALOG}.{SCHEMA}.mpas WHERE search_text LIKE '%{search}%' LIMIT 50"))
-else:
-    print("Tip: type a name in the 'Search MPAs by name' widget, rerun this cell, and copy ids into 'mpa_ids'.")
+search = fold(dbutils.widgets.get("mpa_search").strip())
+
+# --- Diagnostics: show what GFW actually returned, so we can see why a search fails
+print("Top-level response type:", type(mpa_payload).__name__,
+      "| keys:" , list(mpa_payload.keys())[:10] if isinstance(mpa_payload, dict) else "(list)")
+for m in mpa_records[:3]:
+    print("Example record:", json.dumps(m, ensure_ascii=False)[:300])
+
+# --- Find matches in Python (no SQL), ignoring accents and case
+MATCHES = [r for r in mpa_rows if search and search in r["search_text"]]
+print(f"\nSearch '{search}': {len(MATCHES)} match(es)")
+for r in MATCHES[:25]:
+    print(f"  id={r['mpa_id']}  name={r['mpa_name']}")
+if search and not MATCHES:
+    print("No matches. Try a shorter word (e.g. 'galap', 'nazca') or paste an id into mpa_ids.")
 
 # COMMAND ----------
 
@@ -139,11 +149,14 @@ def flatten(e, event_type, mpa_id, mpa_name):
 from pyspark.sql import functions as F
 
 mpa_ids = [m.strip() for m in dbutils.widgets.get("mpa_ids").split(",") if m.strip()]
+if not mpa_ids and MATCHES:
+    mpa_ids = [r["mpa_id"] for r in MATCHES[:3]]   # auto-pick the first 3 search matches
+    print("mpa_ids was empty, so using the first search matches:", mpa_ids)
 types = [t.strip() for t in dbutils.widgets.get("event_types").split(",") if t.strip() in DATASETS]
 start, end = dbutils.widgets.get("start_date"), dbutils.widgets.get("end_date")
-assert mpa_ids, "Set the 'mpa_ids' widget first (use the search above)."
+assert mpa_ids, "No MPA selected: the search found nothing and mpa_ids is empty. Send the 'Example record' lines above to Claude."
 
-names = {r.mpa_id: r.mpa_name for r in spark.table(f"{CATALOG}.{SCHEMA}.mpas").where(F.col("mpa_id").isin(mpa_ids)).collect()}
+names = {r["mpa_id"]: r["mpa_name"] for r in mpa_rows if r["mpa_id"] in mpa_ids}
 
 rows = []
 for mpa_id in mpa_ids:
