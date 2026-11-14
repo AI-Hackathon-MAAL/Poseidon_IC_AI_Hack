@@ -132,7 +132,7 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 | Widget | Meaning |
 | --- | --- |
 | `mode` | `history` (uses `start_date`, `end_date`) or `live` (uses `lookback_days`, counted back from now) |
-| `mpa_ids` / `mpa_search` | Ids win; otherwise every area whose name contains the search text (accents ignored). `11753` = Galápagos Marine Reserve |
+| `mpa_ids` / `mpa_search` | Ids win (leave empty to use the search); otherwise every area whose name contains the search text (accents ignored). `11753` = Galápagos Marine Reserve |
 | `max_cases` | How many cases the agent investigates per run (highest priority first; the rest are `queued`) |
 | `max_steps` | Step budget per case |
 | `focus` | Comma-separated vessel names, ids or MMSIs to investigate first |
@@ -141,6 +141,7 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 | `search_provider` | `linkup`, `tavily` or `none` |
 | `llm_endpoint` | `auto` finds a working chat model in the workspace |
 | `reset_tables` | Drops every Poseidon table first. Set back to `false` afterwards |
+| `snapshot_scope` | `this_run_areas` (default): the snapshot only contains the areas of this run. `all_areas`: every area in the tables |
 | `snapshot_to_repo` | Also writes `data/poseidon_snapshot.json` into the Git folder, ready to commit and push |
 
 **Live monitoring:** create a Databricks Job with this notebook as its task, parameters `mode=live`,

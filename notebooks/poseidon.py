@@ -53,7 +53,7 @@ dbutils.widgets.text("start_date", "2026-08-01")
 dbutils.widgets.text("end_date", "2026-11-14")
 dbutils.widgets.text("lookback_days", "30")
 dbutils.widgets.text("mpa_search", "Galapagos")
-dbutils.widgets.text("mpa_ids", "11753")
+dbutils.widgets.text("mpa_ids", "")
 dbutils.widgets.text("max_cases", "5")
 dbutils.widgets.text("max_steps", "8")
 dbutils.widgets.text("focus", "")
@@ -65,11 +65,12 @@ dbutils.widgets.text("catalog", "workspace")
 dbutils.widgets.text("schema", "poseidon")
 dbutils.widgets.dropdown("reset_tables", "false", ["false", "true"])
 dbutils.widgets.dropdown("snapshot_to_repo", "true", ["true", "false"])
+dbutils.widgets.dropdown("snapshot_scope", "this_run_areas", ["this_run_areas", "all_areas"])
 
 W = {k: dbutils.widgets.get(k).strip() for k in
      ["mode", "start_date", "end_date", "lookback_days", "mpa_search", "mpa_ids", "max_cases", "max_steps", "focus",
       "force_reinvestigate", "data_source", "search_provider", "llm_endpoint", "catalog", "schema", "reset_tables",
-      "snapshot_to_repo"]}
+      "snapshot_to_repo", "snapshot_scope"]}
 CATALOG, SCHEMA = W["catalog"], W["schema"]
 if not all(x.replace("_", "").isalnum() for x in (CATALOG, SCHEMA)):
     raise ValueError("catalog and schema may only contain letters, numbers and underscores")
@@ -284,9 +285,19 @@ save("mpa_status", contract.mpa_status_rows(all_cases, all_events), overwrite=Tr
 
 from datetime import datetime, timezone
 
-snapshot = contract.build_snapshot(read_rows("runs"), all_cases, all_events, read_rows("agent_steps"),
-                                   read_rows("news"), read_rows("mpa_context"),
+# The tables keep every area ever run. By default the snapshot only covers this run's areas.
+keep = {m["mpa_id"] for m in mpas}
+scoped = (lambda rows: rows) if W["snapshot_scope"] == "all_areas" else \
+         (lambda rows: [r for r in rows if str(r.get("mpa_id")) in keep])
+run_rows = read_rows("runs")
+if W["snapshot_scope"] != "all_areas":
+    run_rows = [r for r in run_rows if set(json.loads(r.get("mpa_ids") or "[]")) & keep]
+case_ids = {c["case_id"] for c in scoped(all_cases)}
+snapshot = contract.build_snapshot(run_rows, scoped(all_cases), scoped(all_events),
+                                   [s for s in read_rows("agent_steps") if s.get("case_id") in case_ids],
+                                   scoped(read_rows("news")), scoped(read_rows("mpa_context")),
                                    datetime.now(timezone.utc).isoformat(timespec="seconds"))
+print("Snapshot covers:", ", ".join(m["mpa_name"] for m in snapshot["mpas"]) or "no areas yet")
 snapshot_json = json.dumps(snapshot, default=str, ensure_ascii=False, indent=1)
 try:
     spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.exports")
