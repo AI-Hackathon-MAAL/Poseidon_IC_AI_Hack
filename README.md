@@ -1,6 +1,6 @@
-# Soundings
+# Poseidon
 
-A historical case desk for marine conservation analysts. The workspace opens on an interactive globe. Select a case and choose **Focus area** to inspect the recorded positions, or **Investigate** to open a cited evidence brief. Saved briefs are available from the selected case.
+Poseidon is a maritime investigation agent for conservation analysts. The workspace opens on an interactive globe. Select a case and choose **Focus area** to inspect the recorded positions, or **Run investigation** to open a cited evidence brief. Saved briefs are available from the selected case.
 
 ## Run locally
 
@@ -14,7 +14,7 @@ Open `http://127.0.0.1:3000`. To run the checks, use `npm test`. Set the environ
 
 ## The first investigation
 
-Choose Revillagigedo and the March 2019 case. The last signal on 17 March was outside the park. The next signal, on 18 March, was inside. Soundings computes 24.86 hours between those timestamps and shows the two positions. The vessel’s activity between them is unknown. The archive includes preselected suspected disabling events, so these observations cannot measure detection accuracy or total fishing activity.
+Choose Revillagigedo and the March 2019 case. The last signal on 17 March was outside the park. The next signal, on 18 March, was inside. Poseidon computes 24.86 hours between those timestamps and shows the two positions. The vessel’s activity between them is unknown. The archive includes preselected suspected disabling events, so these observations cannot measure detection accuracy or total fishing activity.
 
 | Protected area | What we checked | What the demo supports |
 | --- | --- | --- |

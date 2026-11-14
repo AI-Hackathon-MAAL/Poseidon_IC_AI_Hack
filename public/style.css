@@ -1,5 +1,5 @@
 @font-face {
-  font-family: "Soundings Inter";
+  font-family: "Inter";
   src: url("/fonts/inter-latin.woff2") format("woff2");
   font-style: normal;
   font-weight: 100 900;
@@ -15,7 +15,7 @@
   --line: #ffffff26;
   --cyan: #b9d9d3;
   --amber: #dec599;
-  --sans: "Soundings Inter", "Inter", "Geist", "Segoe UI", Arial, sans-serif;
+  --sans: "Inter", "Geist", "Segoe UI", Arial, sans-serif;
   --mono: "IBM Plex Mono", "Cascadia Code", Consolas, monospace;
 }
 * { box-sizing: border-box; }
@@ -33,7 +33,7 @@ button, a, select { transition: color 160ms, background 160ms, border-color 160m
 .skip-link:focus { top: 10px; }
 .topbar { height: 56px; display: flex; align-items: center; padding: 0 32px; gap: 36px; background: #202429; border-bottom: 1px solid var(--line); position: relative; z-index: 5; }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 16px; color: var(--ink); text-decoration: none; letter-spacing: -.4px; font-weight: 550; }
-.brand-mark { font-size: 32px; line-height: 1; font-weight: 400; color: #dbe3dd; transform: rotate(-10deg); }
+.brand-mark { display: block; flex: none; }
 .topbar nav { display: flex; height: 100%; align-items: center; gap: 30px; }
 .topbar nav button { border: 0; background: none; padding: 8px 0; color: #c6cbc9; font-size: 12px; }
 .topbar nav button:hover { color: #fff; }

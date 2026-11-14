@@ -89,7 +89,7 @@ function resetBrief(record) {
   $('brief').className = 'brief-empty';
   $('brief').replaceChildren(
     make('h3', record ? 'Reviewing the observation.' : 'Choose an observation.'),
-    make('p', record ? 'The agent’s findings and sources will appear here.' : 'Select another area or expand the date range to find a case.')
+    make('p', record ? 'Poseidon is checking the case evidence.' : 'Select another area or expand the date range to find a case.')
   );
 }
 function openEvidenceDrawer() {
@@ -107,10 +107,10 @@ function selectCase(record, focusArea = false) {
   $('case-kind').textContent = (record.synthetic ? 'Simulated control · ' : '') + (record.kind || 'Historical record');
   $('case-meta').textContent = [record.vessel, casePeriod(record), typeof record.location === 'string' ? record.location : null].filter(Boolean).join(' · ');
   $('investigate').disabled = false;
-  $('investigate').textContent = 'Investigate ↗';
+  $('investigate-label').textContent = 'Run investigation';
   $('status').className = 'status';
   $('status').textContent = '';
-  $('timeline').replaceChildren(make('p', 'Run the agent to check the event, vessel history and dated sources.', 'activity-empty'));
+  $('timeline').replaceChildren(make('p', 'Run an investigation to check this event against vessel history and dated sources.', 'activity-empty'));
   $('activity-state').textContent = 'Awaiting investigation';
   resetBrief(record);
   renderFacts(record);
@@ -122,14 +122,14 @@ function selectCase(record, focusArea = false) {
     if (version !== selectionVersion || running || selected?.id !== saved.id) return;
     renderBrief(saved);
     $('status').textContent = 'Saved brief · ' + date(saved.generatedAt);
-    $('investigate').textContent = 'Investigate again ↗';
+    $('investigate-label').textContent = 'Run again';
   }).catch(() => {});
 }
 function renderQueue() {
   const area = catalog.areas.find(area => area.id === $('area').value);
   $('map-title').textContent = area?.name || 'Protected waters';
   $('area-summary').textContent = area?.summary || '';
-  $('footer-area').textContent = area?.name?.toUpperCase() || 'SOUNDINGS';
+  $('footer-area').textContent = area?.name?.toUpperCase() || 'POSEIDON';
   const from = $('date-from').value;
   const through = $('date-to').value;
   const invalidRange = Boolean(from && through && from > through);
@@ -219,7 +219,7 @@ function renderBrief(brief) {
   $('brief').append(sources);
   const runtime = make('details', null, 'runtime');
   runtime.append(make('summary', 'Data & investigation provenance'));
-  runtime.append(make('div', 'Investigator · ' + (brief.agent?.mode === 'model' ? 'Databricks model' : 'Rules-based replay')),
+  runtime.append(make('div', 'Poseidon agent · ' + (brief.agent?.mode === 'model' ? 'Databricks model' : 'Rules-based replay')),
     make('div', 'Candidate data · ' + brief.candidateOrigin));
   runtime.append(make('div', `Search · ${brief.search?.mode || 'unavailable'}${brief.search?.detail ? ' — ' + brief.search.detail : ''}`), make('div', `Brief storage · ${brief.storage?.mode || 'unavailable'}${brief.storage?.detail ? ' — ' + brief.storage.detail : ''}`));
   $('brief').append(runtime);
@@ -243,10 +243,10 @@ $('investigate').addEventListener('click', async () => {
   $('area').disabled = true;
   $('date-from').disabled = true;
   $('date-to').disabled = true;
-  $('investigate').textContent = 'Investigating…';
+  $('investigate-label').textContent = 'Investigating…';
   $('status').className = 'status';
   $('status').textContent = 'Checking the event, its sources and the applicable rule…';
-  $('activity-state').textContent = 'Agent running';
+  $('activity-state').textContent = 'Poseidon is investigating';
   document.querySelector('.desk').classList.add('running');
   const pendingStep = make('div', null, 'step working');
   const pendingContent = make('div');
@@ -279,7 +279,7 @@ $('investigate').addEventListener('click', async () => {
     $('area').disabled = false;
     $('date-from').disabled = false;
     $('date-to').disabled = false;
-    $('investigate').textContent = 'Investigate again ↗';
+    $('investigate-label').textContent = 'Run again';
   }
 });
 $('area').addEventListener('change', renderQueue);
@@ -311,7 +311,7 @@ async function initialize() {
 initialize();
 
 function downloadBrief(brief) {
-  const rows = [selected?.title || 'Soundings investigation brief', '', brief.summary, '', 'RECORDED OBSERVATIONS'];
+  const rows = [selected?.title || 'Poseidon investigation brief', '', brief.summary, '', 'RECORDED OBSERVATIONS'];
   const sources = brief.sources || [];
   const sourceNumbers = new Map(sources.map((source, index) => [source.id, index + 1]));
   for (const observation of brief.observations || []) {
@@ -320,12 +320,12 @@ function downloadBrief(brief) {
   }
   rows.push('', 'WHAT REMAINS UNKNOWN', ...(brief.unknowns || []), '', 'NEXT STEP', brief.nextStep || '', '', 'SOURCES');
   for (const [index, source] of sources.entries()) rows.push('[' + (index + 1) + '] ' + source.title + ' — ' + source.url);
-  rows.push('', 'Generated ' + date(brief.generatedAt), 'Soundings · Historical observations · Human review required');
+  rows.push('', 'Generated ' + date(brief.generatedAt), 'Poseidon · Historical observations · Human review required');
   const blob = new Blob([rows.join('\n')], {type:'text/plain;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const link = make('a');
   link.href = url;
-  link.download = 'soundings-' + String(brief.id).replace(/[^a-zA-Z0-9_-]/g, '') + '.txt';
+  link.download = 'poseidon-' + String(brief.id).replace(/[^a-zA-Z0-9_-]/g, '') + '.txt';
   document.body.append(link);
   link.click();
   link.remove();

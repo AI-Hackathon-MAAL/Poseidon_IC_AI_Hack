@@ -9,6 +9,7 @@ import { loadCandidates, recordBrief, readBrief } from './providers.mjs';
 const root = fileURLToPath(new URL('./', import.meta.url));
 const assets = new Map([
   ['/', ['index.html', 'text/html']],
+  ['/poseidon.svg', ['poseidon.svg', 'image/svg+xml']],
   ['/app.js', ['app.js', 'text/javascript']],
   ['/style.css', ['style.css', 'text/css']],
   ['/fonts/inter-latin.woff2', ['fonts/inter-latin.woff2', 'font/woff2']],
@@ -99,7 +100,7 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
       }
       return json(res,404,{error:'Unknown resource.'});
     } catch (error) {
-      console.error('Soundings request failed', error.code || error.name, path);
+      console.error('Poseidon request failed', error.code || error.name, path);
       if (!res.headersSent) return json(res,500,{error:'Unable to complete this request. Check the server and try again.'});
       res.end();
     }
@@ -113,6 +114,6 @@ async function readAsset(name) {
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const port = Number(process.env.PORT || 3000);
   const app = createApp();
-  app.on('error', e => { console.error('Unable to start Soundings:',e.code); process.exitCode = 1; });
-  app.listen(port,'127.0.0.1',() => console.info('Soundings is open at http://127.0.0.1:' + app.address().port));
+  app.on('error', e => { console.error('Unable to start Poseidon:',e.code); process.exitCode = 1; });
+  app.listen(port,'127.0.0.1',() => console.info('Poseidon is open at http://127.0.0.1:' + app.address().port));
 }
