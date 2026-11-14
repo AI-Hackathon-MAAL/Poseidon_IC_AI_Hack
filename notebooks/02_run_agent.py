@@ -68,6 +68,11 @@ if SOURCE != "all":
     q = q.where(f"source = '{SOURCE}'")
 candidates = [r.asDict() for r in q.collect()]
 print(f"{len(candidates)} candidate events")
+if not candidates:
+    dbutils.notebook.exit(
+        f"No candidate events with source = '{SOURCE}'. "
+        "For 'gfw': run 01_ingest_gfw first (search an MPA, put its id in mpa_ids, Run all) and check it prints events > 0. "
+        "Or set source to 'sample' to test with synthetic data.")
 
 briefs = agent.run(candidates, tools, llm=llm,
                    start=dbutils.widgets.get("start_date"), end=dbutils.widgets.get("end_date"),
