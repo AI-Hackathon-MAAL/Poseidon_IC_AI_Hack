@@ -145,6 +145,11 @@ def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at, 
     runs = sorted((parse_row("runs", r) for r in runs), key=lambda r: _s(r.get("finished_at")) or "", reverse=True)
     cases = [parse_row("cases", c) for c in cases]
     events = [parse_row("events", e) for e in events]
+    for e in events:   # bulky fields the front end does not use
+        if isinstance(e.get("details"), dict):
+            e["details"] = {k: v for k, v in e["details"].items() if k not in ("mpa_ids", "eez")}
+        for k in ("fetched_at", "also_in_mpas"):
+            e.pop(k, None)
     context = {str(m["mpa_id"]): parse_row("mpa_context", m) for m in mpa_context}
     events_by_case, steps_by_case = {}, {}
     for e in sorted(events, key=lambda e: _s(e.get("start_time")) or ""):
@@ -169,7 +174,10 @@ def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at, 
     mpas = []
     for s in status.values():
         ctx, b = context.get(s["mpa_id"], {}), shapes.get(s["mpa_id"], {})
-        lat, lon = b.get("center_lat"), b.get("center_lon")
+        lat, lon, bbox = b.get("center_lat"), b.get("center_lon"), b.get("bbox")
+        if isinstance(b.get("geometry"), dict):   # recompute so older rows get the antimeridian-safe values
+            from .geo import bbox_and_center
+            bbox, lat, lon = bbox_and_center(b["geometry"])
         if lat is None:   # no outline: centre on the area's cases
             pts = [(float(c["lat"]), float(c["lon"])) for c in cases
                    if str(c.get("mpa_id")) == s["mpa_id"] and c.get("lat") is not None and c.get("lon") is not None]
@@ -177,7 +185,7 @@ def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at, 
                 lat, lon = round(sum(p[0] for p in pts) / len(pts), 4), round(sum(p[1] for p in pts) / len(pts), 4)
         mpas.append({**s, "news_summary": ctx.get("news_summary"), "rules_summary": ctx.get("rules_summary"),
                      "rules_sources": ctx.get("rules_sources") or [],
-                     "boundary": b.get("geometry"), "bbox": b.get("bbox"), "boundary_source": b.get("source"),
+                     "boundary": b.get("geometry"), "bbox": bbox, "boundary_source": b.get("source"),
                      "center_lat": lat, "center_lon": lon})
     return {
         "product": "Poseidon", "generated_at": generated_at, "attribution": ATTRIBUTION,

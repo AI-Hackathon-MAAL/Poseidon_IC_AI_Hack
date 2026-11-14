@@ -119,6 +119,30 @@ reserve; treat ECU artisanal cases with care in the demo.
 
 New `regions = flagship` widget loads 9 regions in one run.
 
+## 9c. Update 23:45 — backend review of the first flagship run
+
+Checked the real snapshot (8 areas, 191 cases) against the code. Found and fixed:
+
+1. **Gap location (biggest).** GFW associates a gap with an area even when the vessel went dark and
+   reappeared outside it. 17 of 25 gaps had both ends outside the outline (all the long "Galápagos" ones).
+   Now each gap is located against the outline (`gap_start_inside`, `gap_end_inside`); only gaps with an
+   end inside score 30, crossing-only gaps score 10 with an explicit caveat. Headlines and briefs reworded.
+2. **Web "reports" were vessel-database pages** (MagicPort, Maritime Optima) or a different ship with the
+   same name; Linkup's own answer said "no reports". Excluded by domain and by IMO mismatch.
+3. **Spelling variants counted as name changes** ("CAP. DANNY B" / "CAP.DANNY B"). Normalised.
+4. **Authorised fishing scored as suspicious.** Phoenix Islands had 3,753 fishing events GFW marks
+   `publicly_authorized` (Kiribati reopened the area to fishing; Linkup's rules summary there is stale).
+   Fishing is now graded by GFW's authorization status (20 / 15 / 5).
+5. **Loitering alone was described as meeting another vessel.** Now 5 points with honest wording; encounter 10.
+6. Beacons mistyped as fishing vessels are dropped by name; antimeridian bbox/centre fixed
+   (Papahānaumokuākea had centre longitude 0); snapshot trimmed.
+
+Effect: high-risk cases 8 -> 1. The credible cluster is **Hermandad**: TUNA PESCA, CAP.DANNY B,
+MARIA DE GRACIA and CHACAO all lost or regained signal inside the reserve. `data/poseidon_snapshot.json`
+was re-scored with `scripts/rescore_snapshot.py` (template briefs); a fresh Databricks run with
+`reset_tables = true` is needed for model-written briefs under the new rules.
+Do not demo Phoenix Islands as "illegal fishing": fishing there is authorised.
+
 ## 10. Next steps, in order
 
 1. Get one real run working from a Git folder under `/Users/...`: `data_source = gfw`, `mode = history`, `2026-05-01` → `2026-11-14`, `mpa_search = Galápagos - Reserva Marina`, `max_cases = 2`, `max_steps = 6`. Fix whatever breaks (expect small GFW/Linkup/model response-shape issues).

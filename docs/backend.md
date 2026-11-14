@@ -103,7 +103,7 @@ In the tables they are JSON strings.
 | `start_time`, `end_time`, `duration_hours` | UTC |
 | `lat`, `lon` | Event position; for gaps, where tracking went **off** |
 | `end_lat`, `end_lon` | For gaps, where tracking came back **on** |
-| `details` | JSON: `gap_distance_km`, `in_no_take_mpa`, `partner_vessel_name`, ... (only present keys) |
+| `details` | JSON, only present keys: `gap_distance_km`, `gap_start_inside` / `gap_end_inside` (was the signal lost / regained inside the area's outline; absent if no outline), `authorization_status` (GFW public-authorization check for fishing events), `in_no_take_mpa`, `partner_vessel_name`, `distance_from_shore_km`, ... |
 | `also_in_mpas` | JSON list of other selected areas that also contain this event |
 | `mode`, `run_id`, `fetched_at` | Which run fetched it |
 

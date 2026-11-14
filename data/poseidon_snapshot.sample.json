@@ -1,10 +1,10 @@
 {
  "product": "Poseidon",
- "generated_at": "2026-11-14T22:15:16+00:00",
+ "generated_at": "2026-11-14T23:15:56+00:00",
  "attribution": "Vessel activity data (c) Global Fishing Watch (apparent activity; non-commercial use). Protected-area outlines: UNEP-WCMC and IUCN, Protected Planet (WDPA). Web context via Linkup.",
  "disclaimer": "Every case is a lead for review, not proof of illegal fishing.",
  "latest_run": {
-  "run_id": "d5d6757e52ac",
+  "run_id": "65f3a7ec3e37",
   "mode": "history",
   "window_start": "2026-10-01",
   "window_end": "2026-10-31",
@@ -16,8 +16,8 @@
    "Sample Marine Reserve (synthetic)",
    "Sample Seamount Sanctuary (synthetic)"
   ],
-  "started_at": "2026-11-14T22:15:16+00:00",
-  "finished_at": "2026-11-14T22:15:16+00:00",
+  "started_at": "2026-11-14T23:15:56+00:00",
+  "finished_at": "2026-11-14T23:15:56+00:00",
   "n_events": 5,
   "n_cases": 4,
   "n_investigated": 3,
@@ -64,16 +64,18 @@
     "reason": "New vessel in this protected area. Queued behind higher-priority cases."
    }
   ],
-  "notes": [],
+  "notes": [
+   "3 gap(s) could not be located against an outline; they are scored as 'associated with' the area."
+  ],
   "objective": "Monitor the selected marine protected areas, investigate vessels with tracking gaps or apparent fishing inside them, and produce evidence-backed leads with explicit uncertainty."
  },
  "runs": [
   {
-   "run_id": "d5d6757e52ac",
+   "run_id": "65f3a7ec3e37",
    "mode": "history",
    "window_start": "2026-10-01",
    "window_end": "2026-10-31",
-   "finished_at": "2026-11-14T22:15:16+00:00",
+   "finished_at": "2026-11-14T23:15:56+00:00",
    "n_events": 5,
    "n_cases": 4,
    "n_investigated": 3
@@ -98,7 +100,7 @@
    "n_encounter": 0,
    "n_loitering": 0,
    "latest_event_at": "2026-10-20T09:15:00Z",
-   "last_investigated_at": "2026-11-14T22:15:16+00:00",
+   "last_investigated_at": "2026-11-14T23:15:56+00:00",
    "news_summary": "Synthetic example: patrols reported a large squid fleet near the reserve boundary this month.",
    "rules_summary": "Synthetic example: industrial fishing is prohibited throughout the reserve.",
    "rules_sources": [
@@ -165,7 +167,7 @@
    "n_encounter": 1,
    "n_loitering": 0,
    "latest_event_at": "2026-10-21T05:00:00Z",
-   "last_investigated_at": "2026-11-14T22:15:16+00:00",
+   "last_investigated_at": "2026-11-14T23:15:56+00:00",
    "news_summary": "Synthetic example: patrols reported a large squid fleet near the reserve boundary this month.",
    "rules_summary": "Synthetic example: industrial fishing is prohibited throughout the reserve.",
    "rules_sources": [
@@ -234,15 +236,15 @@
    "confidence": "high",
    "status": "complete",
    "tracking_status": "flagged_for_review",
-   "headline": "SAMPLE DARK STAR went dark for 100 h in Sample Marine Reserve (synthetic); apparent fishing followed.",
+   "headline": "SAMPLE DARK STAR went dark for 100 h, losing or regaining signal inside Sample Marine Reserve (synthetic); apparent fishing followed.",
    "reasons": [
     {
-     "text": "Tracking (AIS) was switched off 1 time(s) in Sample Marine Reserve (synthetic).",
+     "text": "Global Fishing Watch associates 1 tracking gap(s) with Sample Marine Reserve (synthetic).",
      "points": 30,
      "basis": "events"
     },
     {
-     "text": "Longest dark period lasted 100 hours (3+ days).",
+     "text": "Longest such dark period lasted 100 hours (3+ days).",
      "points": 15,
      "basis": "events"
     },
@@ -252,7 +254,7 @@
      "basis": "events"
     },
     {
-     "text": "The vessel moved about 158 km while its tracking was off.",
+     "text": "It reappeared about 158 km from where tracking was lost.",
      "points": 5,
      "basis": "events"
     },
@@ -437,7 +439,7 @@
    "longest_gap_hours": 100.0,
    "lat": -0.62,
    "lon": -91.4,
-   "brief_markdown": "# SAMPLE DARK STAR — high risk lead\n**Summary:** Risk score 95/100 in Sample Marine Reserve (synthetic). Investigation complete.\n\n## What happened\n- 2026-10-02T04:00:00Z: gap\n\n## Why it matters\n- Tracking (AIS) was switched off 1 time(s) in Sample Marine Reserve (synthetic).\n- Longest dark period lasted 100 hours (3+ days).\n- Apparent fishing began within 48 hours of the vessel reappearing after a dark period.\n- The vessel moved about 158 km while its tracking was off.\n- Has used more than one flag: XXX, QQQ.\n- Has used more than one name: SAMPLE DARK STAR, SAMPLE NIGHT STAR.\n- Repeat pattern: 5 tracking gaps in the previous 12 months.\n- 1 web source(s) link the vessel to illegal fishing, sanctions or detentions.\n\n## What public sources say\nSee [1] [2].\n\n## What we don't know\n\n\n## Suggested next steps\n- Request the vessel track.\n\n## Sources\n1. [Synthetic: SAMPLE DARK STAR listed for IUU fishing](https://example.org/synthetic/iuu-list)\n2. [Synthetic: fleet overview](https://example.org/synthetic/fleet)\n3. [Synthetic: company registry entry](https://example.org/synthetic/company)\n\n_Global Fishing Watch detections are *apparent* activity inferred from AIS. A tracking gap can have innocent causes (equipment failure, poor satellite coverage). This is a lead for review, not proof of illegal fishing._",
+   "brief_markdown": "# SAMPLE DARK STAR — high risk lead\n**Summary:** Risk score 95/100 in Sample Marine Reserve (synthetic). Investigation complete.\n\n## What happened\n- 2026-10-02T04:00:00Z: gap\n\n## Why it matters\n- Global Fishing Watch associates 1 tracking gap(s) with Sample Marine Reserve (synthetic).\n- Longest such dark period lasted 100 hours (3+ days).\n- Apparent fishing began within 48 hours of the vessel reappearing after a dark period.\n- It reappeared about 158 km from where tracking was lost.\n- Has used more than one flag: XXX, QQQ.\n- Has used more than one name: SAMPLE DARK STAR, SAMPLE NIGHT STAR.\n- Repeat pattern: 5 tracking gaps in the previous 12 months.\n- 1 web source(s) link the vessel to illegal fishing, sanctions or detentions.\n\n## What public sources say\nSee [1] [2].\n\n## What we don't know\n\n\n## Suggested next steps\n- Request the vessel track.\n\n## Sources\n1. [Synthetic: SAMPLE DARK STAR listed for IUU fishing](https://example.org/synthetic/iuu-list)\n2. [Synthetic: fleet overview](https://example.org/synthetic/fleet)\n3. [Synthetic: company registry entry](https://example.org/synthetic/company)\n\n_Global Fishing Watch detections are *apparent* activity inferred from AIS. A tracking gap can have innocent causes (equipment failure, poor satellite coverage). This is a lead for review, not proof of illegal fishing._",
    "brief_written_by": "llm",
    "change": "new",
    "previous_risk_score": null,
@@ -448,8 +450,8 @@
    "mode": "history",
    "window_start": "2026-10-01",
    "window_end": "2026-10-31",
-   "run_id": "d5d6757e52ac",
-   "investigated_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "65f3a7ec3e37",
+   "investigated_at": "2026-11-14T23:15:56+00:00",
    "events": [
     {
      "event_id": "sg-1",
@@ -472,19 +474,17 @@
       "gap_distance_km": 158.0,
       "gap_implied_speed_knots": 0.9
      },
-     "also_in_mpas": [],
      "case_id": "sample-1:sample-vessel-dark",
      "mode": "history",
-     "run_id": "d5d6757e52ac",
-     "fetched_at": "2026-11-14T22:15:16+00:00"
+     "run_id": "65f3a7ec3e37"
     }
    ],
    "steps": [
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 1,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "resolve_identity",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -493,10 +493,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 2,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "activity_around_event",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -505,10 +505,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 3,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "web_search_vessel",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -517,10 +517,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 4,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "web_search_owner",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -529,10 +529,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 5,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "vessel_history",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -541,10 +541,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 6,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "finish",
      "decided_by": "llm",
      "reason": "Identity, behaviour and public record are covered.",
@@ -572,15 +572,15 @@
    "confidence": "high",
    "status": "complete",
    "tracking_status": "flagged_for_review",
-   "headline": "SAMPLE VESSEL D went dark for 18 h in Sample Seamount Sanctuary (synthetic).",
+   "headline": "SAMPLE VESSEL D went dark for 18 h, losing or regaining signal inside Sample Seamount Sanctuary (synthetic).",
    "reasons": [
     {
-     "text": "Tracking (AIS) was switched off 1 time(s) in Sample Seamount Sanctuary (synthetic).",
+     "text": "Global Fishing Watch associates 1 tracking gap(s) with Sample Seamount Sanctuary (synthetic).",
      "points": 30,
      "basis": "events"
     },
     {
-     "text": "Met or loitered with another vessel at sea, a possible catch transfer.",
+     "text": "An encounter with another vessel at sea was recorded, a possible catch transfer.",
      "points": 10,
      "basis": "events"
     }
@@ -701,7 +701,7 @@
    "longest_gap_hours": 18.0,
    "lat": -3.0,
    "lon": -88.1,
-   "brief_markdown": "# SAMPLE VESSEL D — medium risk lead\n**Summary:** Risk score 40/100 in Sample Seamount Sanctuary (synthetic). Investigation complete.\n\n## What happened\n- 2026-10-19T02:00:00Z: gap\n- 2026-10-21T00:00:00Z: encounter\n\n## Why it matters\n- Tracking (AIS) was switched off 1 time(s) in Sample Seamount Sanctuary (synthetic).\n- Met or loitered with another vessel at sea, a possible catch transfer.\n\n## What public sources say\nSee [1].\n\n## What we don't know\n\n\n## Suggested next steps\n- Request the vessel track.\n\n## Sources\n1. [Synthetic: reserve management plan](https://example.org/synthetic/rules)\n\n_Global Fishing Watch detections are *apparent* activity inferred from AIS. A tracking gap can have innocent causes (equipment failure, poor satellite coverage). This is a lead for review, not proof of illegal fishing._",
+   "brief_markdown": "# SAMPLE VESSEL D — medium risk lead\n**Summary:** Risk score 40/100 in Sample Seamount Sanctuary (synthetic). Investigation complete.\n\n## What happened\n- 2026-10-19T02:00:00Z: gap\n- 2026-10-21T00:00:00Z: encounter\n\n## Why it matters\n- Global Fishing Watch associates 1 tracking gap(s) with Sample Seamount Sanctuary (synthetic).\n- An encounter with another vessel at sea was recorded, a possible catch transfer.\n\n## What public sources say\nSee [1].\n\n## What we don't know\n\n\n## Suggested next steps\n- Request the vessel track.\n\n## Sources\n1. [Synthetic: reserve management plan](https://example.org/synthetic/rules)\n\n_Global Fishing Watch detections are *apparent* activity inferred from AIS. A tracking gap can have innocent causes (equipment failure, poor satellite coverage). This is a lead for review, not proof of illegal fishing._",
    "brief_written_by": "llm",
    "change": "new",
    "previous_risk_score": null,
@@ -712,8 +712,8 @@
    "mode": "history",
    "window_start": "2026-10-01",
    "window_end": "2026-10-31",
-   "run_id": "d5d6757e52ac",
-   "investigated_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "65f3a7ec3e37",
+   "investigated_at": "2026-11-14T23:15:56+00:00",
    "events": [
     {
      "event_id": "sg-3",
@@ -735,11 +735,9 @@
      "details": {
       "gap_distance_km": 20.0
      },
-     "also_in_mpas": [],
      "case_id": "sample-2:sample-vessel-d",
      "mode": "history",
-     "run_id": "d5d6757e52ac",
-     "fetched_at": "2026-11-14T22:15:16+00:00"
+     "run_id": "65f3a7ec3e37"
     },
     {
      "event_id": "se-1",
@@ -764,19 +762,17 @@
       "partner_vessel_flag": "ZZZ",
       "partner_vessel_type": "CARRIER"
      },
-     "also_in_mpas": [],
      "case_id": "sample-2:sample-vessel-d",
      "mode": "history",
-     "run_id": "d5d6757e52ac",
-     "fetched_at": "2026-11-14T22:15:16+00:00"
+     "run_id": "65f3a7ec3e37"
     }
    ],
    "steps": [
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 1,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "resolve_identity",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -785,10 +781,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 2,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "activity_around_event",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -797,10 +793,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 3,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "web_search_vessel",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -809,10 +805,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 4,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "vessel_history",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -821,10 +817,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 5,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "mpa_rules",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -833,10 +829,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 6,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "finish",
      "decided_by": "llm",
      "reason": "Identity, behaviour and public record are covered.",
@@ -845,104 +841,6 @@
      "duration_ms": 0
     }
    ]
-  },
-  {
-   "case_id": "sample-1:sample-vessel-c",
-   "mpa_id": "sample-1",
-   "mpa_name": "Sample Marine Reserve (synthetic)",
-   "vessel_id": "sample-vessel-c",
-   "vessel_name": "SAMPLE VESSEL C",
-   "vessel_identified": true,
-   "flag": "YYY",
-   "mmsi": "900000003",
-   "imo": null,
-   "callsign": null,
-   "vessel_type": "FISHING",
-   "owner": null,
-   "risk_score": 35,
-   "risk_level": "low",
-   "confidence": "low",
-   "status": "queued",
-   "tracking_status": "no_qualifying_gap_found",
-   "headline": "SAMPLE VESSEL C: 1 event(s) in Sample Marine Reserve (synthetic), awaiting investigation.",
-   "reasons": [
-    {
-     "text": "1 apparent fishing event(s) inside Sample Marine Reserve (synthetic).",
-     "points": 20,
-     "basis": "events"
-    },
-    {
-     "text": "Global Fishing Watch places apparent fishing inside a no-take zone.",
-     "points": 10,
-     "basis": "events"
-    },
-    {
-     "text": "Global Fishing Watch marks a fishing event as potential risk (no matching public authorization).",
-     "points": 5,
-     "basis": "events"
-    }
-   ],
-   "unknowns": [
-    "Not investigated yet: queued behind higher-priority cases."
-   ],
-   "sources": [],
-   "evidence": {},
-   "event_ids": [
-    "sf-1"
-   ],
-   "event_types": "fishing",
-   "n_events": 1,
-   "first_event_at": "2026-10-20T05:00:00Z",
-   "last_event_at": "2026-10-20T09:15:00Z",
-   "longest_gap_hours": null,
-   "lat": -0.9,
-   "lon": -89.8,
-   "brief_markdown": null,
-   "brief_written_by": null,
-   "change": "new",
-   "previous_risk_score": null,
-   "fingerprint": "a06be11e163d",
-   "n_steps": 0,
-   "llm_decisions": 0,
-   "policy_decisions": 0,
-   "mode": "history",
-   "window_start": "2026-10-01",
-   "window_end": "2026-10-31",
-   "run_id": "d5d6757e52ac",
-   "investigated_at": "2026-11-14T22:15:16+00:00",
-   "events": [
-    {
-     "event_id": "sf-1",
-     "event_type": "fishing",
-     "mpa_id": "sample-1",
-     "mpa_name": "Sample Marine Reserve (synthetic)",
-     "vessel_id": "sample-vessel-c",
-     "vessel_name": "SAMPLE VESSEL C",
-     "mmsi": "900000003",
-     "flag": "YYY",
-     "vessel_type": "FISHING",
-     "start_time": "2026-10-20T05:00:00Z",
-     "end_time": "2026-10-20T09:15:00Z",
-     "duration_hours": 4.25,
-     "lat": -0.9,
-     "lon": -89.8,
-     "end_lat": null,
-     "end_lon": null,
-     "details": {
-      "in_no_take_mpa": true,
-      "mpa_ids": [
-       "sample-1"
-      ],
-      "potential_risk": true
-     },
-     "also_in_mpas": [],
-     "case_id": "sample-1:sample-vessel-c",
-     "mode": "history",
-     "run_id": "d5d6757e52ac",
-     "fetched_at": "2026-11-14T22:15:16+00:00"
-    }
-   ],
-   "steps": []
   },
   {
    "case_id": "sample-1:sample-vessel-b",
@@ -962,10 +860,10 @@
    "confidence": "high",
    "status": "complete",
    "tracking_status": "flagged_for_review",
-   "headline": "SAMPLE VESSEL B went dark for 13 h in Sample Marine Reserve (synthetic).",
+   "headline": "SAMPLE VESSEL B went dark for 13 h, losing or regaining signal inside Sample Marine Reserve (synthetic).",
    "reasons": [
     {
-     "text": "Tracking (AIS) was switched off 1 time(s) in Sample Marine Reserve (synthetic).",
+     "text": "Global Fishing Watch associates 1 tracking gap(s) with Sample Marine Reserve (synthetic).",
      "points": 30,
      "basis": "events"
     }
@@ -1065,7 +963,7 @@
    "longest_gap_hours": 13.0,
    "lat": -0.2,
    "lon": -90.9,
-   "brief_markdown": "# SAMPLE VESSEL B — low risk lead\n**Summary:** Risk score 30/100 in Sample Marine Reserve (synthetic). Investigation complete.\n\n## What happened\n- 2026-10-11T18:00:00Z: gap\n\n## Why it matters\n- Tracking (AIS) was switched off 1 time(s) in Sample Marine Reserve (synthetic).\n\n## What public sources say\nSee [1].\n\n## What we don't know\n\n\n## Suggested next steps\n- Request the vessel track.\n\n## Sources\n1. [Synthetic: reserve management plan](https://example.org/synthetic/rules)\n\n_Global Fishing Watch detections are *apparent* activity inferred from AIS. A tracking gap can have innocent causes (equipment failure, poor satellite coverage). This is a lead for review, not proof of illegal fishing._",
+   "brief_markdown": "# SAMPLE VESSEL B — low risk lead\n**Summary:** Risk score 30/100 in Sample Marine Reserve (synthetic). Investigation complete.\n\n## What happened\n- 2026-10-11T18:00:00Z: gap\n\n## Why it matters\n- Global Fishing Watch associates 1 tracking gap(s) with Sample Marine Reserve (synthetic).\n\n## What public sources say\nSee [1].\n\n## What we don't know\n\n\n## Suggested next steps\n- Request the vessel track.\n\n## Sources\n1. [Synthetic: reserve management plan](https://example.org/synthetic/rules)\n\n_Global Fishing Watch detections are *apparent* activity inferred from AIS. A tracking gap can have innocent causes (equipment failure, poor satellite coverage). This is a lead for review, not proof of illegal fishing._",
    "brief_written_by": "llm",
    "change": "new",
    "previous_risk_score": null,
@@ -1076,8 +974,8 @@
    "mode": "history",
    "window_start": "2026-10-01",
    "window_end": "2026-10-31",
-   "run_id": "d5d6757e52ac",
-   "investigated_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "65f3a7ec3e37",
+   "investigated_at": "2026-11-14T23:15:56+00:00",
    "events": [
     {
      "event_id": "sg-2",
@@ -1100,19 +998,17 @@
       "gap_distance_km": 12.0,
       "gap_implied_speed_knots": 0.5
      },
-     "also_in_mpas": [],
      "case_id": "sample-1:sample-vessel-b",
      "mode": "history",
-     "run_id": "d5d6757e52ac",
-     "fetched_at": "2026-11-14T22:15:16+00:00"
+     "run_id": "65f3a7ec3e37"
     }
    ],
    "steps": [
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 1,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "resolve_identity",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1121,10 +1017,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 2,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "activity_around_event",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1133,10 +1029,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 3,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "web_search_vessel",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1145,10 +1041,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 4,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "vessel_history",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1157,10 +1053,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 5,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "mpa_rules",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1169,10 +1065,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "d5d6757e52ac",
+     "run_id": "65f3a7ec3e37",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 6,
-     "at": "2026-11-14T22:15:16+00:00",
+     "at": "2026-11-14T23:15:56+00:00",
      "tool": "finish",
      "decided_by": "llm",
      "reason": "Identity, behaviour and public record are covered.",
@@ -1181,6 +1077,94 @@
      "duration_ms": 0
     }
    ]
+  },
+  {
+   "case_id": "sample-1:sample-vessel-c",
+   "mpa_id": "sample-1",
+   "mpa_name": "Sample Marine Reserve (synthetic)",
+   "vessel_id": "sample-vessel-c",
+   "vessel_name": "SAMPLE VESSEL C",
+   "vessel_identified": true,
+   "flag": "YYY",
+   "mmsi": "900000003",
+   "imo": null,
+   "callsign": null,
+   "vessel_type": "FISHING",
+   "owner": null,
+   "risk_score": 25,
+   "risk_level": "low",
+   "confidence": "low",
+   "status": "queued",
+   "tracking_status": "no_qualifying_gap_found",
+   "headline": "SAMPLE VESSEL C: 1 event(s) in Sample Marine Reserve (synthetic), awaiting investigation.",
+   "reasons": [
+    {
+     "text": "1 apparent fishing event(s) inside Sample Marine Reserve (synthetic); authorization status unknown or pending.",
+     "points": 15,
+     "basis": "events"
+    },
+    {
+     "text": "Global Fishing Watch places apparent fishing inside a no-take zone.",
+     "points": 10,
+     "basis": "events"
+    }
+   ],
+   "unknowns": [
+    "Not investigated yet: queued behind higher-priority cases."
+   ],
+   "sources": [],
+   "evidence": {},
+   "event_ids": [
+    "sf-1"
+   ],
+   "event_types": "fishing",
+   "n_events": 1,
+   "first_event_at": "2026-10-20T05:00:00Z",
+   "last_event_at": "2026-10-20T09:15:00Z",
+   "longest_gap_hours": null,
+   "lat": -0.9,
+   "lon": -89.8,
+   "brief_markdown": null,
+   "brief_written_by": null,
+   "change": "new",
+   "previous_risk_score": null,
+   "fingerprint": "a06be11e163d",
+   "n_steps": 0,
+   "llm_decisions": 0,
+   "policy_decisions": 0,
+   "mode": "history",
+   "window_start": "2026-10-01",
+   "window_end": "2026-10-31",
+   "run_id": "65f3a7ec3e37",
+   "investigated_at": "2026-11-14T23:15:56+00:00",
+   "events": [
+    {
+     "event_id": "sf-1",
+     "event_type": "fishing",
+     "mpa_id": "sample-1",
+     "mpa_name": "Sample Marine Reserve (synthetic)",
+     "vessel_id": "sample-vessel-c",
+     "vessel_name": "SAMPLE VESSEL C",
+     "mmsi": "900000003",
+     "flag": "YYY",
+     "vessel_type": "FISHING",
+     "start_time": "2026-10-20T05:00:00Z",
+     "end_time": "2026-10-20T09:15:00Z",
+     "duration_hours": 4.25,
+     "lat": -0.9,
+     "lon": -89.8,
+     "end_lat": null,
+     "end_lon": null,
+     "details": {
+      "in_no_take_mpa": true,
+      "potential_risk": true
+     },
+     "case_id": "sample-1:sample-vessel-c",
+     "mode": "history",
+     "run_id": "65f3a7ec3e37"
+    }
+   ],
+   "steps": []
   }
  ],
  "news": [
@@ -1194,8 +1178,8 @@
    "query": "Latest news on illegal fishing, fishing fleets or vessel detentions in or near Sample Marine Reserve (synthetic).",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T22:15:16+00:00",
-   "run_id": "d5d6757e52ac"
+   "fetched_at": "2026-11-14T23:15:56+00:00",
+   "run_id": "65f3a7ec3e37"
   },
   {
    "news_id": "950ddfec32d95d8a",
@@ -1207,8 +1191,8 @@
    "query": "Latest news on illegal fishing, fishing fleets or vessel detentions in or near Sample Marine Reserve (synthetic).",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T22:15:16+00:00",
-   "run_id": "d5d6757e52ac"
+   "fetched_at": "2026-11-14T23:15:56+00:00",
+   "run_id": "65f3a7ec3e37"
   },
   {
    "news_id": "8db2064c6cc5949b",
@@ -1220,8 +1204,8 @@
    "query": "Latest news on illegal fishing, fishing fleets or vessel detentions in or near Sample Seamount Sanctuary (synthetic).",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T22:15:16+00:00",
-   "run_id": "d5d6757e52ac"
+   "fetched_at": "2026-11-14T23:15:56+00:00",
+   "run_id": "65f3a7ec3e37"
   },
   {
    "news_id": "566cfd51db216995",
@@ -1233,8 +1217,8 @@
    "query": "Latest news on illegal fishing, fishing fleets or vessel detentions in or near Sample Seamount Sanctuary (synthetic).",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T22:15:16+00:00",
-   "run_id": "d5d6757e52ac"
+   "fetched_at": "2026-11-14T23:15:56+00:00",
+   "run_id": "65f3a7ec3e37"
   }
  ],
  "global_news": [
@@ -1246,8 +1230,8 @@
    "query": "Latest news on illegal, unreported and unregulated fishing: vessels detained, seized or fined, anywhere in the world.",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T22:15:16+00:00",
-   "run_id": "d5d6757e52ac",
+   "fetched_at": "2026-11-14T23:15:56+00:00",
+   "run_id": "65f3a7ec3e37",
    "place_type": "country",
    "place_name": "Ecuador",
    "mpa_id": null,
@@ -1262,8 +1246,8 @@
    "query": "Latest news on illegal, unreported and unregulated fishing: vessels detained, seized or fined, anywhere in the world.",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T22:15:16+00:00",
-   "run_id": "d5d6757e52ac",
+   "fetched_at": "2026-11-14T23:15:56+00:00",
+   "run_id": "65f3a7ec3e37",
    "place_type": "mpa",
    "place_name": "Sample Seamount Sanctuary (synthetic)",
    "mpa_id": "sample-2",
@@ -1278,8 +1262,8 @@
    "query": "Latest news on illegal, unreported and unregulated fishing: vessels detained, seized or fined, anywhere in the world.",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T22:15:16+00:00",
-   "run_id": "d5d6757e52ac",
+   "fetched_at": "2026-11-14T23:15:56+00:00",
+   "run_id": "65f3a7ec3e37",
    "place_type": "none",
    "place_name": null,
    "mpa_id": null,

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 
 from .agent import ask_llm
+from .scoring import gap_location
 
 CAVEAT = ("Global Fishing Watch detections are *apparent* activity inferred from AIS. A tracking gap can have innocent "
           "causes (equipment failure, poor satellite coverage). This is a lead for review, not proof of illegal fishing.")
@@ -14,6 +15,9 @@ BRIEF_SYSTEM = (
     "Detections are 'apparent': this is a lead, never an accusation. "
     "Cite web sources inline as [n], matching the `n` of each entry in `sources`. Do not cite a source for a claim it does not support. "
     "Copy every number (score, hours, dates, counts) exactly as given. "
+    "A tracking gap means the position is UNKNOWN while dark: never say the vessel was inside the area during a gap. "
+    "Use `gap_ends_relative_to_area`: 'inside' = signal was lost or regained inside the area; 'outside' = both ends "
+    "were outside and the vessel may only have crossed it. Do not call fishing unauthorised unless `reasons` says so. "
     "Write Markdown with exactly these sections:\n"
     "# <vessel name> — <risk_level> risk lead\n"
     "**Summary:** two sentences.\n"
@@ -36,7 +40,10 @@ def brief_facts(case, assessment, ctx):
         "confidence": assessment["confidence"], "investigation_status": assessment["status"],
         "reasons": [r["text"] for r in assessment["reasons"]],
         "unknowns": assessment["unknowns"],
-        "events": [{k: e.get(k) for k in ("event_type", "start_time", "end_time", "duration_hours", "lat", "lon")}
+        "events": [{**{k: e.get(k) for k in ("event_type", "start_time", "end_time", "duration_hours", "lat", "lon")},
+                    **({"gap_ends_relative_to_area": gap_location(e)} if e["event_type"] == "gap" else {}),
+                    **({"fishing_authorization": (e.get("details") or {}).get("authorization_status")}
+                       if e["event_type"] == "fishing" else {})}
                    for e in case.events[:15]],
         "identity": {k: v for k, v in case.identity().items() if v not in (None, [], "")},
         "activity_around_event": ev.get("activity_around_event"),

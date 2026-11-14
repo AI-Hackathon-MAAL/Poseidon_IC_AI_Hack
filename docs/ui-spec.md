@@ -219,9 +219,13 @@ Each item: `title` (link to `url`), source domain extracted from the URL, `snipp
 
 Purpose: explain the system honestly. Static content plus live numbers.
 
-- How a score is built: the points table (gap 30, long gap +10/+15, fishing 20, no-take zone 10, fishing
-  within 48 h of a gap 15, moved 50 km+ while dark 5, encounter or loitering 10, unidentified 10, multiple
-  flags or names 5 each, repeat gaps 5, web reports naming the vessel or owner 15 each; maximum 100).
+- How a score is built: the points table. Signal lost or regained inside the area 30 (a gap whose two ends
+  are both outside the outline scores only 10: the vessel's presence inside is not established); dark 24 h+
+  +10 or 72 h+ +15; apparent fishing inside 20 with no matching public authorization, 15 if unknown, 5 if
+  publicly authorized; no-take zone +10; fishing within 48 h of reappearing 15; reappeared 50 km+ away 5;
+  encounter 10 (loitering alone 5); unidentified 10; several flags 5; several real names 5 (spelling variants
+  do not count); 3+ gaps in 12 months 5; web reports naming the vessel or owner 15 each (vessel-database
+  pages do not count). Maximum 100.
 - What the agent decides (which checks, when to stop) versus what code decides (scores, durations, status).
 - Limits: a gap is not guilt; data is delayed; vessels without AIS are invisible; scores are signals, not probabilities.
 - Data sources and attribution.

@@ -275,6 +275,25 @@ if W["reset_tables"] == "true":
         spark.sql(f"DROP TABLE IF EXISTS {table(name)}")
     print("All Poseidon tables dropped (reset_tables = true). Set it back to false.")
 
+# Outlines for the map: fetched once per area, then remembered
+have = {b["mpa_id"] for b in read_rows("mpa_boundaries") if b.get("geometry")}
+new_shapes = []
+for m in mpas:
+    if m["mpa_id"] in have:
+        continue
+    if SAMPLE:
+        g = geo.simplify_geometry(sample.SAMPLE_BOUNDARIES.get(m["mpa_id"]))
+        bbox, lat, lon = geo.bbox_and_center(g)
+        b = {"geometry": g, "bbox": bbox, "center_lat": lat, "center_lon": lon, "source": "synthetic"}
+    else:
+        b = geo.fetch_boundary(m["mpa_id"], gfw=gfw)
+    print(f"  outline for {m['mpa_name']}: " + (f"ok ({b['source']})" if b.get("geometry") else f"not found ({b.get('error')})"))
+    new_shapes.append({**m, **b, "fetched_at": pipeline.now_iso()})
+BOUNDARIES = {b["mpa_id"]: json.loads(b["geometry"]) if isinstance(b.get("geometry"), str) else b.get("geometry")
+              for b in read_rows("mpa_boundaries") if b.get("geometry")}
+BOUNDARIES.update({b["mpa_id"]: b["geometry"] for b in new_shapes if b.get("geometry")})
+
+
 memory = pipeline.memory_from_rows(read_rows("cases"))
 print(f"Memory: {len(memory)} case(s) remembered from earlier runs\n")
 
@@ -282,6 +301,7 @@ ctx = Context(gfw=gfw, search=search, llm=llm, window_start=window_start, window
               mode=W["mode"], max_steps=int(W["max_steps"]))
 result = pipeline.run(ctx, mpas, memory=memory, max_cases=int(W["max_cases"]), per_area=True,
                       exclude_types=[t for t in W["exclude_vessel_types"].split(",") if t.strip()],
+                      boundaries=BOUNDARIES,
                       force=W["force_reinvestigate"] == "true",
                       focus=[f for f in W["focus"].split(",") if f.strip()], llm_endpoint=LLM_ENDPOINT)
 run_row = result["run"][0]
@@ -325,28 +345,13 @@ def save(name, rows, overwrite=False):
             spark.sql("MERGE " + tail)
     print(f"  {name}: {len(rows)} row(s) written")
 
+save("mpa_boundaries", new_shapes)
 save("events", result["events"])
 save("cases", result["cases"])
 save("agent_steps", result["steps"])
 save("runs", result["run"])
 save("news", result["news"])
 save("mpa_context", result["mpa_context"])
-
-# Outlines for the map: fetched once per area, then remembered
-have = {b["mpa_id"] for b in read_rows("mpa_boundaries") if b.get("geometry")}
-new_shapes = []
-for m in mpas:
-    if m["mpa_id"] in have:
-        continue
-    if SAMPLE:
-        g = geo.simplify_geometry(sample.SAMPLE_BOUNDARIES.get(m["mpa_id"]))
-        bbox, lat, lon = geo.bbox_and_center(g)
-        b = {"geometry": g, "bbox": bbox, "center_lat": lat, "center_lon": lon, "source": "synthetic"}
-    else:
-        b = geo.fetch_boundary(m["mpa_id"], gfw=gfw)
-    print(f"  outline for {m['mpa_name']}: " + (f"ok ({b['source']})" if b.get("geometry") else f"not found ({b.get('error')})"))
-    new_shapes.append({**m, **b, "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
-save("mpa_boundaries", new_shapes)
 
 # Global intel layer: worldwide news, placed on the map by area or country name
 if W["global_news"] == "true" and search is not None:

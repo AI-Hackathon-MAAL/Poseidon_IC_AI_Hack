@@ -373,5 +373,85 @@ class RealDataFixes(unittest.TestCase):
         self.assertEqual([m["mpa_id"] for m in got], ["11753", "8", "9"])
 
 
+class ReviewFixes(unittest.TestCase):
+    """Bugs found by checking the first real flagship run against its own data."""
+
+    BOX = {"type": "MultiPolygon", "coordinates": [[[[-92.6, -2.0], [-88.9, -2.0], [-88.9, 1.2], [-92.6, 1.2], [-92.6, -2.0]]]]}
+
+    def scored(self, events, evidence=None):
+        from poseidon.agent import Case
+        from poseidon.scoring import score_case
+        c = Case("sample-1", "Sample Reserve", "v", "TEST VESSEL", "XXX", "1", "fishing", events)
+        c.evidence = evidence or {}
+        return score_case(c)
+
+    def gap(self, hours, start_inside, end_inside):
+        return {"event_id": "g", "event_type": "gap", "duration_hours": hours, "start_time": "2026-10-01T00:00:00Z",
+                "end_time": "2026-10-05T00:00:00Z", "details": {"gap_start_inside": start_inside, "gap_end_inside": end_inside}}
+
+    def test_gap_with_both_ends_outside_is_not_scored_as_dark_inside_the_area(self):
+        crossing = self.scored([self.gap(1466, False, False)])
+        inside = self.scored([self.gap(130, True, True)])
+        self.assertEqual(crossing["risk_score"], 10)
+        self.assertIn("presence inside is not established", crossing["reasons"][0]["text"])
+        self.assertTrue(any("both ends of the gap lie outside" in c for c in crossing["caveats"]))
+        self.assertEqual(inside["risk_score"], 45)   # 30 + 15 for 3+ days
+        self.assertGreater(inside["risk_score"], crossing["risk_score"])
+
+    def test_pipeline_locates_gaps_against_the_outline(self):
+        out = run(make_ctx(), boundaries={"sample-1": self.BOX})
+        gaps = {e["event_id"]: e["details"] for e in out["events"] if e["event_type"] == "gap"}
+        self.assertEqual((gaps["sg-1"]["gap_start_inside"], gaps["sg-1"]["gap_end_inside"]), (True, True))
+        self.assertNotIn("gap_start_inside", gaps["sg-3"])            # sample-2 has no outline
+        self.assertIn("losing or regaining signal inside", case(out, "sample-vessel-dark")["headline"])
+        self.assertTrue(any("could not be located" in n for n in out["run"][0]["notes"]))
+
+    def test_spelling_variants_are_not_name_changes(self):
+        from poseidon.scoring import distinct_names
+        self.assertEqual(len(distinct_names(["CAP. DANNY B", "CAP.DANNY B"])), 1)
+        self.assertEqual(len(distinct_names(["BELLERIVE", "F/V BELLE RIVE"])), 1)
+        self.assertEqual(len(distinct_names(["DOÑA TERE", "DONA TERE", "TITIS"])), 2)
+        self.assertEqual(len(distinct_names(["DIVA MARIA", "CHACAO"])), 2)
+
+    def test_authorised_fishing_scores_less_than_unauthorised(self):
+        def fish(status):
+            return {"event_id": "f", "event_type": "fishing", "start_time": "2026-10-01T00:00:00Z", "end_time": None,
+                    "duration_hours": 2, "details": {"authorization_status": status}}
+        ok = self.scored([fish("publicly_authorized")])
+        bad = self.scored([fish("not_matching_relevant_public_authorization")])
+        self.assertEqual((ok["risk_score"], bad["risk_score"]), (5, 20))
+        self.assertTrue(any("permitted" in c for c in ok["caveats"]))
+
+    def test_loitering_alone_is_not_called_a_meeting(self):
+        loiter = {"event_id": "l", "event_type": "loitering", "duration_hours": 3, "start_time": "2026-10-01T00:00:00Z", "details": {}}
+        r = self.scored([loiter])["reasons"][0]
+        self.assertEqual(r["points"], 5)
+        self.assertNotIn("another vessel", r["text"])
+
+    def test_web_hit_about_a_different_ship_with_the_same_name_is_ignored(self):
+        from poseidon.scoring import web_risk_hits
+        src = [{"url": "https://news.example.org/x", "title": "JUAN PABLO II (IMO 9252345) detained",
+                "snippet": "Offshore supply ship JUAN PABLO II was detained."}]
+        self.assertEqual(web_risk_hits(src, ["JUAN PABLO II"], imo="9831189"), [])
+        self.assertEqual(len(web_risk_hits(src, ["JUAN PABLO II"], imo="9252345")), 1)
+
+    def test_beacons_mistyped_as_fishing_vessels_are_dropped_by_name(self):
+        self.assertTrue(pipeline.looks_like_gear("BUOY 064-732    12V6"))
+        self.assertTrue(pipeline.looks_like_gear("BOYA 5 ROLTON 91%"))
+        self.assertTrue(pipeline.looks_like_gear("HSD-NET-99%"))
+        for real in ("CHACAO", "TUNA PESCA", "FONG KUO NO.688", "MARIBO 65", "JIN HUI 18", "NETTUNO", "SYY35-2023-01"):
+            self.assertFalse(pipeline.looks_like_gear(real), real)
+
+    def test_area_crossing_the_antimeridian_gets_a_usable_centre(self):
+        from poseidon import geo
+        g = {"type": "MultiPolygon", "coordinates": [[[[177, 20], [180, 20], [180, 30], [177, 30], [177, 20]]],
+                                                     [[[-180, 20], [-161, 20], [-161, 30], [-180, 30], [-180, 20]]]]}
+        bbox, lat, lon = geo.bbox_and_center(g)
+        self.assertEqual(bbox, [177, 20, 199, 30])
+        self.assertEqual((lat, lon), (25.0, -172.0))
+        self.assertTrue(geo.point_in_geometry(-170, 25, g))
+        self.assertFalse(geo.point_in_geometry(-150, 25, g))
+
+
 if __name__ == "__main__":
     unittest.main()

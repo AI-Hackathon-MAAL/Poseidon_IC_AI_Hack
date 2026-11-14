@@ -89,10 +89,33 @@ def simplify_geometry(obj, max_points=400, max_parts=40):
 
 
 def bbox_and_center(geometry):
+    """bbox [west, south, east, north] and centre. For an area that crosses the antimeridian the
+    east edge is given beyond 180 (e.g. [177, 19, 199, 32]) so map libraries can fit it."""
     pts = [p for poly in geometry["coordinates"] for ring in poly for p in ring]
     xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-    bbox = [min(xs), min(ys), max(xs), max(ys)]
-    return bbox, round((bbox[1] + bbox[3]) / 2, 4), round((bbox[0] + bbox[2]) / 2, 4)
+    if max(xs) - min(xs) > 180:   # crosses the antimeridian: measure in 0..360
+        xs = [x + 360 if x < 0 else x for x in xs]
+    bbox = [round(min(xs), 4), round(min(ys), 4), round(max(xs), 4), round(max(ys), 4)]
+    lon = (bbox[0] + bbox[2]) / 2
+    return bbox, round((bbox[1] + bbox[3]) / 2, 4), round(lon - 360 if lon > 180 else lon, 4)
+
+
+def point_in_geometry(lon, lat, geometry):
+    """True if the point is inside any polygon of a (simplified) MultiPolygon. None if unknown."""
+    if geometry is None or lon is None or lat is None:
+        return None
+    try:
+        lon, lat = float(lon), float(lat)
+    except (TypeError, ValueError):
+        return None
+    for poly in geometry.get("coordinates") or []:
+        ring, inside = poly[0], False
+        for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
+            if (y1 > lat) != (y2 > lat) and lon < (x2 - x1) * (lat - y1) / (y2 - y1) + x1:
+                inside = not inside
+        if inside:
+            return True
+    return False
 
 
 def fetch_boundary(mpa_id, gfw=None, session=None, timeout=60):

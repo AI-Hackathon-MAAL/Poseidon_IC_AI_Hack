@@ -6,13 +6,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import unicodedata
 import uuid
 
 from .agent import Case, OBJECTIVE, assess, investigate, mpa_news, now_iso, ToolError
 from .brief import write_brief
 from .gfw import GFWError, REGION_EVENT_TYPES, flatten_event
-from .scoring import longest_gap_hours, score_case
+from .geo import point_in_geometry
+from .scoring import gap_location, longest_gap_hours, score_case
 
 
 def fold(text):
@@ -71,12 +73,22 @@ def select_mpas(all_mpas, search="", ids="", per_term=2):
     return out
 
 
+_GEAR_NAME = re.compile(r"\b(BUOY|BOYA|BOUEE|NET|NETS|FAD)\b|\d\s*%|\b\d{1,2}(\.\d)?V\d?\b", re.I)
+
+
+def looks_like_gear(name):
+    """Beacon names: 'BUOY 064-732 12V6', 'BOYA 5 ROLTON 91%', 'HSD-NET-99%' (battery level or voltage)."""
+    return bool(name and _GEAR_NAME.search(str(name).replace("-", " ").replace("_", " ")))
+
+
 def exclude_non_fishing(events, excluded=DEFAULT_EXCLUDED_TYPES):
     """Drop events from vessel types that are not fishing vessels. Returns (kept, counts by type)."""
     excluded = {t.strip().lower() for t in excluded if t and t.strip()}
     kept, dropped = [], {}
     for e in events:
         t = str(e.get("vessel_type") or "").lower()
+        if "gear" in excluded and t not in excluded and looks_like_gear(e.get("vessel_name")):
+            t = "gear"   # mis-typed beacon: the name gives it away
         if t in excluded:
             dropped[t] = dropped.get(t, 0) + 1
         else:
@@ -140,11 +152,13 @@ def fingerprint(case):
 
 def priority(case, change):
     types = [e["event_type"] for e in case.events]
-    longest = longest_gap_hours(case.events)
+    gaps = [e for e in case.events if e["event_type"] == "gap"]
+    solid = [g for g in gaps if gap_location(g) != "outside"]   # signal lost or regained inside the area
+    longest = longest_gap_hours(solid or gaps)
     p = 0.0
     if longest is not None:
-        p += 30 + min(longest, 120) / 4
-    p += 10 * min(types.count("gap"), 3)
+        p += (30 + min(longest, 120) / 4) * (1 if solid else 0.3)
+    p += 10 * min(len(solid), 3)
     if "fishing" in types:
         p += 20
     if "gap" in types and "fishing" in types:
@@ -229,7 +243,7 @@ def _case_row(ctx, case, a, brief, written_by, change, mem, fp, run_id):
 
 
 def run(ctx, mpas, memory=None, max_cases=5, force=False, focus=(), run_id=None, events=None,
-        llm_endpoint=None, log=print, per_area=False, exclude_types=DEFAULT_EXCLUDED_TYPES):
+        llm_endpoint=None, log=print, per_area=False, exclude_types=DEFAULT_EXCLUDED_TYPES, boundaries=None):
     """Execute one run. Returns {"run", "events", "cases", "steps", "news", "mpa_context"} as lists of row dicts."""
     run_id = run_id or uuid.uuid4().hex[:12]
     started, memory = now_iso(), memory or {}
@@ -242,6 +256,23 @@ def run(ctx, mpas, memory=None, max_cases=5, force=False, focus=(), run_id=None,
         msg = ", ".join(f"{n} {t}" for t, n in sorted(dropped.items()))
         notes.append(f"Ignored {sum(dropped.values())} events from non-fishing vessel types ({msg}).")
         log(f"[filter] ignored non-fishing vessel types: {msg}")
+
+    # Where did each gap start and end relative to the area's outline? (None when no outline is known)
+    located = 0
+    for e in events:
+        geometry = (boundaries or {}).get(str(e["mpa_id"]))
+        if e["event_type"] == "gap" and geometry:
+            e["details"]["gap_start_inside"] = point_in_geometry(e.get("lon"), e.get("lat"), geometry)
+            e["details"]["gap_end_inside"] = point_in_geometry(e.get("end_lon"), e.get("end_lat"), geometry)
+            located += 1
+    gaps_total = sum(e["event_type"] == "gap" for e in events)
+    if gaps_total:
+        n_in = sum(e["event_type"] == "gap" and gap_location(e) == "inside" for e in events)
+        log(f"[locate] {gaps_total} gap(s): {n_in} lost or regained signal inside an area, "
+            f"{sum(e['event_type'] == 'gap' and gap_location(e) == 'outside' for e in events)} only crossed, "
+            f"{gaps_total - located} without an outline")
+        if located < gaps_total:
+            notes.append(f"{gaps_total - located} gap(s) could not be located against an outline; they are scored as 'associated with' the area.")
 
     cases = build_cases(events)
     case_of = {(e["mpa_id"], e["vessel_id"]): f"{e['mpa_id']}:{e['vessel_id']}" for e in events if e.get("vessel_id")}

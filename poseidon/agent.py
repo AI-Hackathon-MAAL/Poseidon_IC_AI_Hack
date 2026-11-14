@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from .gfw import EVENT_DATASETS, GFWError, day, flatten_event, parse_time, summarize_identity
-from .scoring import longest_gap_hours, score_case, web_risk_hits
+from .scoring import gap_location, longest_gap_hours, score_case, web_risk_hits
 from .search import SearchError
 
 OBJECTIVE = ("Monitor the selected marine protected areas, investigate vessels with tracking gaps or apparent "
@@ -268,7 +268,7 @@ def tool_web_search_vessel(ctx, case):
     query = (f"Has {who}{' (' + tags + ')' if tags else ''} been reported for illegal, unreported or unregulated "
              f"fishing, sanctions, detention or fines? Cite the reports.")
     res = _web(ctx, query)
-    hits = web_risk_hits(res["sources"], [name, imo, mmsi])
+    hits = web_risk_hits(res["sources"], [name, imo, mmsi], imo=imo)
     text = f"{len(res['sources'])} web source(s) found; {len(hits)} mention this vessel together with illegal fishing or sanctions."
     return {**res, "risk_hits": hits}, text
 
@@ -516,13 +516,17 @@ def status_for(ctx, case):
 
 def headline(case, score):
     name, where = case.display_name(), case.mpa_name or "the protected area"
-    longest = longest_gap_hours(case.events)
+    gaps = [e for e in case.events if e["event_type"] == "gap"]
+    inside = [g for g in gaps if gap_location(g) != "outside"]
     followed = any("within 48 hours" in r["text"] for r in score["reasons"])
     fishing = sum(e["event_type"] == "fishing" for e in case.events)
-    if longest is not None:
-        return f"{name} went dark for {longest:.0f} h in {where}" + ("; apparent fishing followed." if followed else ".")
+    if inside:
+        return (f"{name} went dark for {longest_gap_hours(inside):.0f} h, losing or regaining signal inside {where}"
+                + ("; apparent fishing followed." if followed else "."))
     if fishing:
         return f"{name}: {fishing} apparent fishing event(s) inside {where}."
+    if gaps:
+        return f"{name}: {longest_gap_hours(gaps):.0f} h tracking gap that may have crossed {where} (both ends outside)."
     kinds = ", ".join(sorted({e["event_type"] for e in case.events}))
     return f"{name}: {kinds} event(s) in {where}."
 
@@ -530,5 +534,6 @@ def headline(case, score):
 def assess(ctx, case):
     """Everything derived from evidence by code: score, status, unknowns, sources, headline."""
     score = score_case(case, ctx.gap_hours)
-    return {**score, "status": status_for(ctx, case), "unknowns": unknowns_for(ctx, case),
+    caveats = score.pop("caveats", [])
+    return {**score, "status": status_for(ctx, case), "unknowns": caveats + unknowns_for(ctx, case),
             "sources": collect_sources(case), "headline": headline(case, score)}
