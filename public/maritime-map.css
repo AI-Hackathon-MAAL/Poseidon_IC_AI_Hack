@@ -66,11 +66,15 @@
   background:var(--marker);border:1px solid #11292c;
   box-shadow:0 0 0 2px #0b222ac9,0 0 0 3px #82bbb787;
 }
-.mar-marker[data-cluster="true"] {
+.mar-marker[data-glyph="observation"][data-cluster="true"] {
   width:32px;height:32px;background:#173b3b;border:1px solid #8dcdc0;
   box-shadow:0 0 0 3px #82cfbb26,0 2px 6px #0009;
 }
-.mar-marker[data-cluster="true"]::before {display:none}
+.mar-marker[data-glyph="observation"][data-cluster="true"]::before {display:none}
+.mar-marker[data-glyph="history"][data-cluster="true"]::after {
+  content:"";position:absolute;width:4px;height:4px;transform:translate(6px,-6px);
+  border:1px solid #11292c;border-radius:50%;background:var(--marker);pointer-events:none;
+}
 .mar-marker:is(:hover,:focus-visible),.mar-marker[data-focused="true"] {
   z-index:1;outline:2px solid #f1d29b;outline-offset:2px;
 }

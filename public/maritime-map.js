@@ -3,6 +3,7 @@
 (() => {
   'use strict';
   const DEG = Math.PI / 180;
+  const REGIONAL_SPAN = 12;
   const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
   const wrap = lon => ((lon + 540) % 360 + 360) % 360 - 180;
   const regionalCenters = {
@@ -64,7 +65,7 @@
     }
     return ['#abcde5', 'rgba(171,205,229,.45)'];
   }
-  function fit(data, width, height, positions, minimumSpan=12) {
+  function fit(data, width, height, positions) {
     const points = [...positions];
     if (validBounds(data.map)) {
       const [w,s,e,n] = data.map.bounds;
@@ -85,7 +86,7 @@
     let south=90,north=-90;
     for(const p of points){south=Math.min(south,p.lat);north=Math.max(north,p.lat);}
     const lat = (south + north) / 2, aspect = width / Math.max(1,height);
-    const span = Math.max(minimumSpan, (east-west)*Math.cos(lat*DEG)*1.65, (north-south)*aspect*1.6);
+    const span = Math.max(REGIONAL_SPAN, (east-west)*Math.cos(lat*DEG)*1.65, (north-south)*aspect*1.6);
     return {lon:wrap((west+east)/2),lat,span:Math.min(span,155)};
   }
   function camera(view,w,h,mini=false) {
@@ -342,8 +343,12 @@
       focusedCase=focusCase;
       const overview=!focusCase && data.contextPoints.length>0;
       const point=focusCase && !fitHistory && validLocation(data.focusPoint) ? data.focusPoint : null;
-      const home=point ? {lon:point.lon,lat:point.lat,span:2.8} :
-        fit(data,width,height,overview && !data.historyMode ? data.contextPoints : data.points,data.historyMode?2.8:12);
+      // Keep a regional view on entry. Moving through a vessel's timestamps pans
+      // at the analyst's chosen scale, including after a manual zoom.
+      let observationSpan=2.8;
+      if(data.historyMode)observationSpan=view.mode==='area'?view.span:REGIONAL_SPAN;
+      const home=point ? {lon:point.lon,lat:point.lat,span:observationSpan} :
+        fit(data,width,height,overview && !data.historyMode ? data.contextPoints : data.points);
       view={mode,lon:home.lon,lat:home.lat,span:home.span,mag:1};
       if(mode==='globe'&&!overview){
         // Frame the park beside the North American coastline on the opening hemisphere.
@@ -473,7 +478,8 @@
         btn.dataset.latest=String(Boolean(latest));
         btn.dataset.glyph=latest?(point.vesselType==='gear'?'gear':'ship'):
           ships?(group.points.every(p=>p.vesselType==='gear')?'gear':
-          group.points.every(p=>p.vesselType!=='gear')?'ship':'contacts'):'observation';
+          group.points.every(p=>p.vesselType!=='gear')?'ship':'contacts'):
+          data.historyMode?'history':'observation';
         btn.style.left=group.x+'px';btn.style.top=group.y+'px';
         const name=latest ? (count>1?'Latest position of '+vesselLabel(point)+' and '+(count-1)+' nearby recorded '+(count===2?'position':'positions'):'Open latest position of '+vesselLabel(point)) :
           ships ? (count>1?'Choose from '+count+' nearby contacts':'Open '+vesselLabel(point)) :
@@ -481,7 +487,7 @@
           'Open '+(point.label||'recorded position');
         const label=name+' near '+coord(point.lat,true)+', '+coord(point.lon);
         btn.setAttribute('aria-label',label);btn.title=label;
-        btn.textContent=!ships && !latest && count>1 ? String(count) : '';
+        btn.textContent=!data.vesselMode && count>1 ? String(count) : '';
       }
       while(markerButtons.length>groups.length)markerButtons.pop().remove();
     }
@@ -654,7 +660,12 @@
       else return;
       e.preventDefault();dirty();
     });
-    stage.addEventListener('wheel',e=>{if(document.activeElement!==stage)return;e.preventDefault();zoom(e.deltaY<0?1:-1);},{passive:false});
+    stage.addEventListener('wheel',e=>{
+      if(document.activeElement!==stage || !e.deltaY || e.ctrlKey)return;
+      const unit=e.deltaMode===1?16:e.deltaMode===2?height:1;
+      const steps=clamp(-e.deltaY*unit/120,-1,1);
+      e.preventDefault();zoom(steps);
+    },{passive:false});
     new ResizeObserver(resize).observe(root);resize();
     texture('earth').then(t=>{world=t;if(!t)textureState.textContent='Relief layer unavailable';dirty();});
     texture('pacific').then(t=>{pacific=t;dirty();});
