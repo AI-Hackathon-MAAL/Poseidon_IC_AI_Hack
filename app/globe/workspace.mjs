@@ -3,6 +3,8 @@ import {queryCases, queueStats, contextPoints, groupVessels} from '../../public/
 import {loadWorkspaceSnapshot, exportRevision} from './snapshot-loader.mjs';
 import {appendRunContext, appendCaseContext} from './agent-context.mjs';
 import {renderVesselPhoto} from '../../public/vessel-photo.mjs';
+import {mountAreaExplorer} from './area-explorer.mjs';
+import {renderWatchSummary} from './watch-summary.mjs';
 
 const statusNames = {complete: 'Completed', queued: 'Queued', incomplete: 'Incomplete'};
 const shortArea = name => (name || '').replace(/\s*[-–]\s*Reserva Marina$/i, '');
@@ -17,13 +19,16 @@ const positionLabel = (lat, lon) => [
 
 export function startWorkspace({$, make, date, safeLink, renderReport}) {
   let catalog, revision, loading = false;
-  let groups = [], anchors = [], vessel = null, selected = null, point = null;
+  let groups = [], anchors = [], areaEvents = [], vessel = null, selected = null, point = null;
   let groupIndex = new Map(), areaIndex = new Map();
   const dossier = document.querySelector('.case-dossier');
   const picker = $('point-picker');
   const casePicker = $('investigation-picker');
   const refreshButton = $('refresh-export');
   const briefDialog = $('brief-dialog');
+  const watchDialog = $('watch-dialog');
+  const areaTools = mountAreaExplorer({host:$('area-explorer'), searchHost:$('area-search-results'),
+    onArea: id => goArea(id), onFilter: () => renderQueue()});
   const shortDate = value => date(value).split(' · ')[0];
   const dateLabels = new Map();
   function displayDate(value) {
@@ -37,7 +42,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
   $('open-cases').firstChild.textContent = 'Explore vessels ';
   $('old-provenance').hidden = true;
   document.querySelectorAll('[data-export-ui]').forEach(el => { el.hidden = false; });
-  $('about-workflow').textContent = 'Each ship marker shows its latest recorded position in the selection. Select a vessel to explore its recorded positions and open the agent’s published investigation for the relevant protected area.';
+  $('about-workflow').textContent = 'The explorer includes all vessels in the publication and labels fishing gear separately. Choose an area to narrow the fleet, or select a ship to inspect its recorded positions and the agent’s published report. The map uses the latest dated observation available for each contact.';
   $('brief-title').textContent = 'Agent report';
   $('date-toggle').firstElementChild.textContent = 'Filters';
   $('date-from').value = $('date-to').value = '';
@@ -52,18 +57,50 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
   function areaName(record) {
     return areaIndex.get(record.areaId)?.name || record.snapshotCase.mpa_name || record.areaId;
   }
+  function goArea(id) {
+    const key = String(id ?? '');
+    if (!catalog || (key && !areaIndex.has(key))) return;
+    $('area').value = key;
+    vessel = selected = point = null;
+    areaTools.update(catalog.snapshot, key);
+    renderQueue({resetView:true});
+  }
+  function upOneLevel() {
+    if (vessel) goArea(selected?.areaId || $('area').value);
+    else if ($('area').value) goArea('');
+  }
+  function breadcrumbs() {
+    const bar = $('drill-path');
+    bar.replaceChildren();
+    const id = selected?.areaId || $('area').value;
+    bar.hidden = !id && !vessel;
+    if (bar.hidden) return;
+    const add = (label, click) => {
+      if (bar.children.length) { const sep = make('span','›'); sep.setAttribute('aria-hidden','true'); bar.append(sep); }
+      const crumb = make(click ? 'button' : 'span',label);
+      if (click) { crumb.type='button'; crumb.addEventListener('click',click); }
+      else crumb.setAttribute('aria-current','location');
+      bar.append(crumb);
+    };
+    add('Globe',()=>goArea(''));
+    if (id) add(shortArea(areaIndex.get(id)?.name || id),vessel ? ()=>goArea(id) : null);
+    if (vessel) add(vessel.vesselName);
+  }
   function showMap(focus = false, overview = false, fitHistory = false) {
-    const area = areaIndex.get($('area').value);
+    const regionId = selected?.areaId || $('area').value;
+    const area = areaIndex.get(regionId);
+    breadcrumbs();
     window.SoundingsMap?.render($('map'), {
       area, map: null, vesselMode: true, caseId: vessel?.vesselKey, activeVesselKey: vessel?.vesselKey,
       caseTitle: vessel?.vesselName, points: vessel?.points || [], historyPoints: vessel?.points || [],
       contextPoints: anchors, vesselAnchor: vessel?.anchor, focusPoint: point, focusArea: focus, overview, fitHistory,
-      onSelectVessel: selectVessel, onSelectObservation: selectObservation, onOverview: () => clearSelection(true)
+      regions: catalog.snapshot.mpas, globalNews: catalog.snapshot.global_news || [], activeRegionId: regionId,
+      areaEvents: selected ? selected.events.filter(eventMatches) : areaEvents,
+      onSelectRegion: goArea, onSelectVessel: selectVessel, onSelectObservation: selectObservation, onOverview: () => goArea('')
     });
     $('map-title').textContent = area?.name || 'All protected areas';
-    const mappedType = anchors.some(p => p.vesselType === 'gear') ? 'tracked object' : 'vessel';
     $('map-caption').textContent = vessel ? vessel.vesselName + ' · ' + count(vessel.points.length, 'recorded position') :
-      count(anchors.length, mappedType) + ' · Latest recorded positions';
+      (area ? shortArea(area.name) + ' · ' : '') + 'Latest available observations';
     $('footer-area').textContent = area?.name || 'All protected areas';
   }
   function setActive() {
@@ -78,8 +115,8 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     vessel = selected = point = null;
     dossier.classList.remove('point-detail');
     dossier.classList.add('overview-state');
-    $('case-title').textContent = groups.length ? 'Select a vessel' : 'No matching vessels';
-    $('case-meta').textContent = groups.length ? 'Open a ship on the map or in the explorer to see its history and investigation.' : 'Adjust the filters to see more vessels.';
+    $('case-title').textContent = groups.length ? 'Select a vessel' : 'No matching contacts';
+    $('case-meta').textContent = groups.length ? 'Choose a ship to see its recorded positions and investigation.' : 'Adjust the filters to see more contacts.';
     $('case-kind').textContent = '';
     $('case-facts').replaceChildren();
     picker.parentElement.hidden = casePicker.parentElement.hidden = $('clear-point').hidden = true;
@@ -117,6 +154,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
       ? (samePoint(point, vessel.anchor) ? 'Last observed' : 'Recorded position') + ' · ' + (point.markerTime ? displayDate(point.markerTime) : 'Time unavailable')
       : 'No dated position available for this selection.';
     $('case-facts').replaceChildren();
+    fact('Position history',count(vessel.points.length, 'recorded position'));
     if (point) {
       fact('Position', positionLabel(point.lat, point.lon));
       fact('Observation', point.label);
@@ -126,16 +164,18 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     picker.selectedIndex = point ? vessel.points.findIndex(p => samePoint(p, point)) : -1;
     casePicker.value = selected.id;
     $('clear-point').hidden = false;
+    $('clear-point').textContent = '← Back to area';
     $('investigate').disabled = !hasReport(selected);
     $('investigate-label').textContent = hasReport(selected) ? 'View agent report' : raw.status === 'queued' ? 'Queued for investigation' : 'Report unavailable';
     $('investigate').lastElementChild.hidden = !hasReport(selected);
   }
-  function selectVessel(key) {
+  function selectVessel(key, preferredCase) {
     const next = groupIndex.get(key);
     if (!next) return;
     vessel = next;
-    point = vessel.anchor;
-    selected = vessel.cases.find(row => row.id === point?.caseId) || vessel.cases[0];
+    const requested = typeof preferredCase === 'string' && vessel.cases.find(row=>row.id===preferredCase);
+    point = requested ? vessel.points.find(p=>p.caseId===requested.id) || null : vessel.anchor;
+    selected = requested || vessel.cases.find(row => row.id === point?.caseId) || vessel.cases[0];
     setPickers();
     showDetail();
     renderVesselPhoto($('point-photo'), selected);
@@ -155,8 +195,10 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     showDetail();
     showMap(true);
   }
+  const score = record => Number.isFinite(record.snapshotCase?.risk_score) ? record.snapshotCase.risk_score : -1;
+  const priorityCase = group => group.cases.reduce((best,next)=>score(next)>score(best)?next:best);
   function vesselRow(group) {
-    const record = group.cases[0];
+    const record = priorityCase(group);
     const raw = record.snapshotCase;
     const button = make('button', null, 'case');
     button.type = 'button';
@@ -170,7 +212,8 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     const areas = [...new Set(group.cases.map(row => shortArea(areaName(row))))].join(' / ');
     const byline = [areas, group.anchor && displayDate(group.anchor.markerTime).split(' · ')[0]].filter(Boolean).join(' · ');
     const report = group.cases.some(hasReport) ? 'Report available' : statusNames[raw.status];
-    const summary = [group.isGear ? 'Fishing gear' : '', count(group.points.length, 'position'), report].filter(Boolean).join(' · ');
+    const identity = group.isGear ? 'Fishing gear' : raw.vessel_identified === false ? 'Unidentified vessel' : raw.flag || '';
+    const summary = [identity, report, !group.anchor && 'No mapped position'].filter(Boolean).join(' · ');
     button.append(top, make('span', summary, 'case-signal'), make('span', byline, 'case-byline'));
     button.addEventListener('click', () => {
       selectVessel(group.vesselKey);
@@ -180,27 +223,54 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     });
     return button;
   }
+  function eventMatches(event) {
+    const from = $('date-from').value, thru = $('date-to').value;
+    const type = areaTools.getFilters().eventType;
+    if (type && event.event_type !== type) return false;
+    if (!from && !thru) return true;
+    const first = (event.start_time || event.end_time || '').slice(0,10);
+    const last = (event.end_time || event.start_time || '').slice(0,10);
+    return Boolean(first) && (!from || last >= from) && (!thru || first <= thru);
+  }
   function renderQueue({resetView = false} = {}) {
     if (!catalog) return;
     const from = $('date-from').value, through = $('date-to').value;
     $('filter-error').textContent = from && through && from > through ? 'Choose an end date on or after the start date.' : '';
+    const {minRisk, identified, eventType} = areaTools.getFilters();
     const visible = queryCases(catalog, {from, through, areaId: $('area').value, search: $('case-search').value,
-      status: $('case-status').value, mode: $('case-mode').value});
+      status: $('case-status').value, mode: $('case-mode').value}).filter(r => {
+      const raw = r.snapshotCase;
+      if (minRisk > 0 && !(score(r) >= minRisk)) return false;
+      if (identified && raw.vessel_identified !== (identified === 'identified')) return false;
+      if (eventType) return r.events.length ? r.events.some(eventMatches) :
+        String(raw.event_types || '').split(',').map(s=>s.trim()).includes(eventType);
+      return true;
+    });
+    areaEvents = $('area').value ? visible.flatMap(r=>r.events.filter(eventMatches)) : [];
     const positions = contextPoints(visible).filter(p => {
+      if (eventType && p.eventType !== eventType) return false;
       if (!from && !through) return true;
       const day = p.markerTime?.slice(0, 10);
       return day && (!from || day >= from) && (!through || day <= through);
     });
     groups = groupVessels(visible, positions, catalog.cases).filter(group => !group.isGear || $('show-gear').checked);
+    const sort = $('case-sort').value;
+    if (sort === 'priority' || sort === 'fleet') groups.sort((a,b) =>
+      (sort === 'fleet' && Number(a.isGear) - Number(b.isGear)) ||
+      score(priorityCase(b)) - score(priorityCase(a)) || a.vesselName.localeCompare(b.vesselName));
     if ($('case-sort').value === 'name') groups.sort((a,b) => a.vesselName.localeCompare(b.vesselName));
     if ($('case-sort').value === 'recent') groups.sort((a,b) => (Date.parse(b.anchor?.markerTime) || 0) - (Date.parse(a.anchor?.markerTime) || 0));
     groupIndex = new Map(groups.map(group => [group.vesselKey, group]));
-    anchors = groups.flatMap(group => group.anchor ? [group.anchor] : []);
+    anchors = groups.flatMap(group => {
+      if (!group.anchor) return [];
+      const item = priorityCase(group).snapshotCase;
+      return [{...group.anchor, riskLevel:item.risk_level, riskScore:item.risk_score, status:item.status}];
+    });
     const gear = groups.filter(g => g.isGear).length;
     const ships = count(groups.length - gear, 'vessel');
     $('queue-result').textContent = [ships, gear && count(gear, 'gear transmitter')].filter(Boolean).join(' · ');
     $('total-cases').textContent = groups.length - gear;
-    $('total-events').textContent = groups.reduce((n, g) => n + g.points.length, 0);
+    $('total-gear').textContent = gear;
     $('total-complete').textContent = groups.reduce((n, g) => n + g.cases.filter(hasReport).length, 0);
     $('cases').replaceChildren(...groups.map(vesselRow));
     if (!groups.length) {
@@ -233,7 +303,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     $('snapshot-date').title = date(next.snapshot.generated_at);
     const provenance = [next.snapshot.attribution || 'Global Fishing Watch', next.snapshot.disclaimer || 'Each case is a lead for human review.'].join(' ');
     $('footer-provenance').textContent = provenance;
-    for (const dialog of [briefDialog, $('export-dialog'), $('about-dialog')]) {
+    for (const dialog of [briefDialog, watchDialog, $('export-dialog'), $('about-dialog')]) {
       let note = dialog.querySelector('.publication-credit');
       if (!note) {
         note = make('p', '', 'publication-credit');
@@ -247,7 +317,20 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     const all = option('All protected areas', '');
     $('area').replaceChildren(all, ...next.areas.map(area => option(area.name, area.id)));
     $('area').value = areaIndex.has(priorArea) ? priorArea : '';
+    areaTools.update(next.snapshot, $('area').value);
+    $('watch-button').disabled = false;
     renderQueue();
+  }
+  function openWatchCase(raw) {
+    if (!raw || !catalog.cases.some(row=>row.id===raw.case_id)) return;
+    watchDialog.close();
+    // The watch list covers the whole publication, regardless of explorer filters.
+    for (const id of ['case-search','date-from','date-to','case-mode','case-status']) $(id).value='';
+    if (raw.vessel_type === 'gear') $('show-gear').checked = true;
+    areaTools.update(catalog.snapshot, '');
+    goArea(raw.mpa_id);
+    const group = groups.find(g=>g.cases.some(r=>r.id===raw.case_id));
+    if (group) { selectVessel(group.vesselKey, raw.case_id); $('case-title').focus(); }
   }
   function showDataset() {
     if (!catalog) return;
@@ -294,7 +377,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     return latest;
   }
   async function refresh(manual = false) {
-    if (loading || (!manual && (document.hidden || briefDialog.open || $('export-dialog').open))) return;
+    if (loading || (!manual && (document.hidden || document.querySelector('dialog[open]')))) return;
     loading = true;
     refreshButton.disabled = true;
     try {
@@ -313,7 +396,18 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
       }
     } finally { loading = false; refreshButton.disabled = false; }
   }
-  $('area').addEventListener('change', () => renderQueue({resetView:true}));
+  $('area').addEventListener('change', () => goArea($('area').value));
+  $('watch-button').addEventListener('click', () => {
+    if (!catalog) return;
+    renderWatchSummary($('watch-detail'), catalog.snapshot, openWatchCase);
+    watchDialog.showModal();
+  });
+  $('close-watch').addEventListener('click',()=>watchDialog.close());
+  document.addEventListener('keydown',event=>{
+    if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('dialog[open]')) return;
+    if (event.target.closest('input,select,textarea,[contenteditable=true]')) return;
+    if (vessel || $('area').value) { event.preventDefault(); upOneLevel(); }
+  });
   $('case-search').addEventListener('input',renderQueue);
   for (const id of ['case-sort','date-from','date-to','case-mode','case-status','show-gear']) $(id).addEventListener('change',renderQueue);
   picker.addEventListener('change', () => {
@@ -329,7 +423,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     showMap(Boolean(point));
   });
   $('clear-point').addEventListener('click', () => {
-    clearSelection(true);
+    upOneLevel();
     if ($('map').getBoundingClientRect().bottom < 140) {
       $('map').scrollIntoView({behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block:'start'});
     }

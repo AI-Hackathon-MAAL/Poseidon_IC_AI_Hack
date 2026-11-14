@@ -8,13 +8,16 @@ const snapshotFile = fileURLToPath(new URL('data/poseidon_snapshot.json', reposi
 // Only these public browser resources are available through the app host.
 const files = new Set([
   'app/globe/workspace.mjs', 'app/globe/shell.js', 'app/globe/style.css',
+  'app/globe/area-explorer.mjs', 'app/globe/area-explorer.css',
+  'app/globe/watch-summary.mjs', 'app/globe/watch-summary.css',
+  'app/globe/geo-layers.js', 'app/globe/geo-layers.css',
   'app/globe/maritime-map.js', 'app/globe/snapshot-loader.mjs', 'app/globe/agent-context.mjs',
   'app/assets/poseidon.svg', 'app/assets/fonts/inter-latin.woff2',
   'app/assets/earth-relief.webp', 'app/assets/pacific-relief.webp',
   'public/style.css', 'public/maritime-map.css', 'public/snapshot-drawer.js',
   'public/case-query.mjs', 'public/snapshot-workspace.mjs', 'public/vessel-photo.mjs',
   'public/published-export.mjs',
-  'data/poseidon_snapshot.sample.json',
+  'data/poseidon_snapshot.sample.json','data/mpa_index.json',
 ]);
 const types = {
   '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -42,7 +45,14 @@ export async function serveGlobe(path, res) {
   }
   const filename = path.slice(1);
   if (!files.has(filename)) return false;
-  const bytes = await readFile(new URL(filename, repository));
+  let bytes;
+  try { bytes = await readFile(new URL(filename, repository)); }
+  catch (error) {
+    if (filename !== 'data/mpa_index.json' || error.code !== 'ENOENT') throw error;
+    // The optional index was not published. The explorer still searches the watched areas.
+    res.writeHead(200, {'Content-Type': types['.json'], 'Cache-Control':'no-cache'}).end('[]');
+    return true;
+  }
   res.writeHead(200, {'Content-Type': types[extname(filename)], 'Cache-Control': 'no-cache'}).end(bytes);
   return true;
 }

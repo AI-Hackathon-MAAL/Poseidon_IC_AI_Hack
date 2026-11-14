@@ -2,7 +2,11 @@
 
 The original Poseidon globe is the landing page. Select a ship on the globe or in the explorer to focus the map on its recorded positions. **Position history** steps through dated observations; **Investigation** switches between protected-area cases for the same vessel. **View agent report** opens the brief the notebook actually published, including its sources, limits and tool decisions. Queued investigations do not have a report yet.
 
-**Dataset details** shows publication time, latest observation, protected areas, the latest run's triage decisions and regional news. The explorer checks for a newer publication every minute while visible. Markers show dated observations from the selected data, not real-time vessel locations. Gear transmitters are excluded until **Include tracked fishing gear** is selected.
+The fleet index includes every published vessel, even without a mappable position or completed report. Ships and tracked gear have separate counts; turn off **Include tracked fishing gear** for ships only. **Area details** narrows the fleet by event type, minimum risk and vessel identity. Breadcrumbs or Escape take you from the vessel back to its area and then the globe.
+
+**Watch overview** shows the highest-priority cases, recent agent activity and any published global intelligence. **Dataset details** shows publication time, latest observation, the agent's triage decisions and regional news. The explorer checks for a newer publication every minute while visible. Markers show dated observations, not real-time vessel locations.
+
+The globe accepts the optional `mpas[].boundary`, `bbox`, published centres and `global_news[]` fields from the [updated UI specification](../docs/ui-spec.md). Articles without a location stay in the feed. A sibling `data/mpa_index.json` extends search beyond the investigated areas. The saved real export predates these fields: its ships are available without drawing inferred reserve boundaries.
 
 From the repository root:
 

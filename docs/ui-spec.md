@@ -18,7 +18,8 @@ Every case is a **lead for review, not proof**. The UI must never present a case
 - Load one JSON file: `data/poseidon_snapshot.json` (real). If it is missing, load
   `data/poseidon_snapshot.sample.json` (synthetic, same shape) and show a visible `SYNTHETIC DATA` badge
   (the sample has `"synthetic": true`).
-- Top-level keys: `latest_run`, `runs[]`, `mpas[]`, `cases[]`, `news[]`, `generated_at`, `attribution`, `disclaimer`.
+- Top-level keys: `latest_run`, `runs[]`, `mpas[]` (with outlines), `cases[]`, `news[]`, `global_news[]`, `generated_at`, `attribution`, `disclaimer`.
+- `data/mpa_index.json` (optional): `{id, name}` for every protected area, for the search box. If missing, search only `mpas[]`.
 - Each case carries its own `events[]` (map and timeline) and `steps[]` (the agent's decisions).
 - No backend calls are needed. Treat the file as read-only. All filtering and sorting happens client-side.
 - Times are ISO 8601 UTC. Display as `14 NOV 2026 · 20:41Z`.
@@ -42,7 +43,7 @@ marketing dashboard.
 
 ## 4. App shell (present on every screen)
 
-**Left rail (collapsed icons, expands on hover):** Overview · Live · Cases · Agent · Areas · Intel · Method.
+**Left rail (collapsed icons, expands on hover):** Globe · Live · Cases · Agent · Areas · Intel · Method.
 
 **Top status bar (always visible, single line):**
 
@@ -63,43 +64,53 @@ marketing dashboard.
 
 ## 5. Views
 
-### 5.1 Overview (landing)
+### 5.1 Globe (landing)
 
-Purpose: the situation at a glance. Three zones.
+Purpose: the world at a glance, then drill down. Three levels on one map: globe → area → vessel.
 
-**A. KPI strip (top, 5 tiles, monospace numerals):**
+**Level 1: Globe.**
 
-| Tile | Data |
-| --- | --- |
-| High-risk leads | count of `cases` where `risk_level == "high"` |
-| Vessels gone dark | count of cases with `longest_gap_hours != null` |
-| Unidentified vessels | count where `vessel_identified == false` |
-| Events in window | sum of `mpas[].n_events` |
-| Sources cited | total `sources[]` across cases |
+- Dark world map (MapLibre globe projection if available, else flat). Opens zoomed out.
+- **Protected-area outlines:** draw `mpas[].boundary` (GeoJSON MultiPolygon) for every area. Fill at about 12%
+  opacity and stroke in the colour of its highest risk: `n_high > 0` red, else `n_medium > 0` amber, else
+  `n_low > 0` green, else grey ("watched, nothing flagged"). If `boundary` is null, show a ring marker at
+  `center_lat`/`center_lon` instead. Label each area by name when zoomed in enough.
+- **Global intel markers:** `global_news[]` items with `lat`/`lon`, as small cyan diamonds. Cluster when close.
+  Hover shows `title` and source domain; click opens the article link. Items with `place_type == "none"`
+  appear only in the feed. Country-level markers sit at an approximate country centre: style them lighter
+  and label them "country-level".
+- **KPI strip (top, monospace numerals):** areas watched (`mpas.length`) · high-risk leads · vessels gone
+  dark (`longest_gap_hours != null`) · unidentified vessels · sources cited.
+- **Search bar (top centre, `/` to focus):** searches `data/mpa_index.json` (every protected area) plus
+  vessels. Choosing an area that exists in `mpas[]` flies the map to its `bbox` and opens its panel.
+  Choosing one that does not shows a card: "Not investigated yet. Poseidon can watch this area: run the
+  notebook with mpa_ids = <id>."
+- **Right rail:** *Global intel feed* (`global_news[]`, newest first, with place tags) above *Priority queue*
+  (top 8 cases worldwide by `risk_score`).
+- **Bottom ticker:** latest agent activity across all cases (last 6 `steps[]` by `at`).
 
-**B. Theatre map (centre, about 65% width):**
+**Level 2: Area (click an outline, or zoom in past a threshold).**
 
-- Dark basemap (ocean bathymetry tones, no labels clutter). MapLibre or Leaflet with a dark tile style.
-- One marker per case at `lat`/`lon`, coloured by `risk_level`, sized by `risk_score`. Queued cases are hollow.
-- For each `events[]` item of type `gap` with `end_lat`/`end_lon`: a dashed line from (`lat`,`lon`) "tracking
-  lost" to (`end_lat`,`end_lon`) "tracking resumed". This dashed segment is the signature visual: it shows
-  where the vessel was invisible.
-- Other event types as small glyphs: fishing (dot), encounter (two linked dots), loitering (ring).
-- Hover a marker: tooltip with `vessel_name`, `flag`, `risk_score`, `headline`. Click: open the dossier drawer.
-- Map controls: event-type toggles, risk filter, "fit to area". Legend in a corner panel.
-- MPA boundaries are not in the data. Show the area name as a label near its cases; do not draw invented outlines.
+- Map flies to the area's `bbox`. Its cases appear as markers (coloured by `risk_level`, sized by
+  `risk_score`, hollow when queued). For each `gap` event with `end_lat`/`end_lon`, draw the dashed
+  "dark segment" from where tracking was lost to where it resumed. Other events as small glyphs.
+- **Area panel (left drawer):** name; risk distribution bar; counters (`n_cases`, `n_events`, `n_gap`,
+  `n_fishing`, `n_unidentified`, `n_flagged_for_review`); `last_investigated_at`; **Rules** (`rules_summary`
+  with `rules_sources[]` links); **Regional context** (`news_summary`); the area's cases as a compact list.
+- **Query panel (inside the drawer):** controls that filter what is shown for this area, client-side:
+  mode (`history` / `live`), date range (filters `events[]` and cases by `first_event_at`/`last_event_at`),
+  event types, minimum risk, identified vs unidentified. Show the loaded window from the case's
+  `window_start`/`window_end` so the user knows the limits. Below it, a muted note: "To investigate a
+  different period, run Poseidon for this area" with the area's id to copy.
+- Boundary attribution in the map corner from `boundary_source`.
 
-**C. Priority queue (right, about 35% width):** the top 8 cases by `risk_score`. Each row: risk score in a
-coloured block, `vessel_name`, flag code, `headline`, and chips for `status` and `change`. "View all" goes to Cases.
+**Level 3: Vessel (click a marker or a list row).** Opens the case dossier (5.4).
 
-**D. Bottom strip (two panels):**
-- *Latest agent activity*: last 6 entries across all `cases[].steps[]` sorted by `at`, as a ticker:
-  `20:41Z · resolve_identity · SAMPLE DARK STAR · Identity resolved…`
-- *Intel*: top 3 `news[]` items (title, source domain, time).
+Back navigation: breadcrumb `Globe › Area name › Vessel name`; `Esc` goes up one level.
 
 ### 5.2 Live
 
-Purpose: the monitoring view. Same layout as Overview but filtered to cases with `mode == "live"`, with a
+Purpose: the monitoring view. Same layout as the Globe's area level but filtered to cases with `mode == "live"`, with a
 pulsing `LIVE` chip and a freshness banner.
 
 - Banner (mandatory, honest): "Latest available data. Global Fishing Watch publishes events with a delay;
@@ -199,7 +210,7 @@ Expanded area view: `rules_summary` with `rules_sources[]` links ("What the rule
 
 ### 5.7 Intel
 
-Purpose: fresh, cited web context. A feed of `news[]`, newest first.
+Purpose: fresh, cited web context. Two feeds, newest first: *Global* (`global_news[]`, with `place_name` tags) and *By area* (`news[]`).
 
 Each item: `title` (link to `url`), source domain extracted from the URL, `snippet`, `mpa_name` tag,
 `fetched_at`, and `provider` ("via Linkup"). Filter by area. Group by day.
@@ -238,7 +249,7 @@ Purpose: explain the system honestly. Static content plus live numbers.
 1. App shell, theme and snapshot loader (with sample fallback).
 2. Cases table.
 3. Case dossier (assessment, brief, sources, unknowns).
-4. Overview map with dark-gap segments.
+4. Globe with area outlines, intel markers, search and the area drill-down with dark-gap segments.
 5. Agent trace with replay.
 6. Live view, Areas, Intel, Method.
 

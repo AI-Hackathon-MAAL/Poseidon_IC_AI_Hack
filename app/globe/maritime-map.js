@@ -23,6 +23,7 @@
   ];
   const textures = Object.create(null);
   const instances = new WeakMap();
+  const geo = window.PoseidonGeoLayers;
 
   function texture(name) {
     if (textures[name]) return textures[name];
@@ -210,6 +211,24 @@
     return a && b && a.caseId===b.caseId && a.eventId===b.eventId && a.role===b.role &&
       a.lon===b.lon && a.lat===b.lat;
   }
+  function gapSegments(points){
+    const events=new Map();
+    for(const p of points){
+      if(p.eventType!=='gap' || !p.eventId || !['gap-start','gap-end'].includes(p.role))continue;
+      const key=JSON.stringify([p.caseId,p.eventId]);
+      if(!events.has(key))events.set(key,{});
+      events.get(key)[p.role]=p;
+    }
+    const lines=[];
+    for(const pair of events.values()){
+      const start=pair['gap-start'],end=pair['gap-end'];
+      if(!start || !end)continue;
+      const dl=wrap(end.lon-start.lon),dy=end.lat-start.lat;
+      const steps=Math.max(1,Math.ceil(Math.max(Math.abs(dl),Math.abs(dy))/2));
+      lines.push(Array.from({length:steps+1},(_,i)=>[wrap(start.lon+i*dl/steps),start.lat+i*dy/steps]));
+    }
+    return lines;
+  }
   function groupPositions(points,cam,focusPoint) {
     const groups=[],cells=new Map(),spacing=36;
     for(const point of points) {
@@ -273,13 +292,30 @@
     const textureState=el('div','mar-texture-state');
     const chooser=el('section','mar-picker');
     chooser.hidden=true;chooser.setAttribute('aria-label','Nearby contacts');
-    readout.append(scale,location);root.append(stage,regionCallout,modes,tools,locator,readout,attribution,sr,textureState,chooser);container.replaceChildren(root);
+    const boundaryCredit=el('span','geo-boundary-credit');
+    const gapKey=el('span','mar-gap-key','AIS gap · route unknown');
+    gapKey.hidden=true;
+    readout.append(scale,location);root.append(stage,regionCallout,modes,tools,locator,readout,attribution,boundaryCredit,gapKey,sr,textureState,chooser);container.replaceChildren(root);
 
     let data={points:[],contextPoints:[]}, view={mode:'globe',lon:-108,lat:20,span:25,mag:1};
     let frame=0,drag=null,width=1,height=1,world=null,pacific=null,signature='';
     let focusedCase=false,ignorePointerClick=false,flight=null,lastCamera=null,rasterKey='',pickerOwner=null;
     const reduceMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const markerButtons=[];
+    const layers=geo.create(stage,id=>data.onSelectRegion?.(id),showNews);
+    function showNews(group,owner){
+      if(!group?.items.length)return;
+      if(group.items.length===1){window.open(group.items[0].url,'_blank','noopener,noreferrer');return;}
+      closeChooser();chooser.setAttribute('aria-label','Global news at this location');
+      const heading=el('div','mar-picker-head');
+      heading.append(el('strong','','Global news'),button('Close global news','×',()=>closeChooser(true)));
+      const list=el('div','mar-picker-list');
+      for(const article of group.items){
+        const link=el('a','mar-picker-item',article.label);
+        link.href=article.url;link.target='_blank';link.rel='noopener noreferrer';list.append(link);
+      }
+      chooser.replaceChildren(heading,list);placePicker(group,owner,list.firstElementChild);
+    }
     function closeChooser(restore=false){
       if(chooser.hidden)return;
       chooser.hidden=true;
@@ -337,9 +373,9 @@
       chooser.replaceChildren(heading,list);
       placePicker(group,owner,list.firstElementChild);
     }
-    chooser.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeChooser(true);}});
+    chooser.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeChooser(true);}});
     root.addEventListener('focusout',e=>{if(!chooser.hidden && e.relatedTarget && !chooser.contains(e.relatedTarget))closeChooser();});
-    function reset(mode='area', focusCase=false, animate=false, fitHistory=false) {
+    function reset(mode='area', focusCase=false, animate=false, fitHistory=false, fitAll=false) {
       closeChooser();
       focusedCase=focusCase;
       const overview=!focusCase && data.contextPoints.length>0;
@@ -348,9 +384,19 @@
       // at the analyst's chosen scale, including after a manual zoom.
       let observationSpan=2.8;
       if(data.historyMode)observationSpan=view.mode==='area'?view.span:REGIONAL_SPAN;
+      let extent=overview && !data.historyMode ? data.contextPoints : data.points;
+      if(!extent.length && !focusCase)extent=(data.regions||[]).map(region=>geo.center(region)||geo.regionBounds(region)).filter(Boolean);
+      const enteringArea=!data.historyMode && mode==='area' && data.activeRegion && !fitAll;
+      const regionView=enteringArea && geo.frame(data.activeRegion,width,height);
+      if(enteringArea && !regionView){
+        // Distant drifting gear can otherwise centre a reserve on a different ocean.
+        const vesselPositions=extent.filter(point=>point.vesselType!=='gear');
+        if(vesselPositions.length)extent=vesselPositions;
+      }
       const home=point ? {lon:point.lon,lat:point.lat,span:observationSpan} :
-        fit(data,width,height,overview && !data.historyMode ? data.contextPoints : data.points);
+        regionView || fit(data,width,height,extent);
       view={mode,lon:home.lon,lat:home.lat,span:home.span,mag:1};
+      if(fitAll && home.span>120)view.tilt=0;
       if(mode==='globe'&&!overview){
         // Frame the park beside the North American coastline on the opening hemisphere.
         if(data.area?.id==='revillagigedo'){view.lon=-111;view.lat=20;}
@@ -371,11 +417,23 @@
     }
     function zoom(direction) {
       closeChooser();flight=null;
-      if(view.mode==='globe') view.mag=clamp(view.mag*Math.pow(1.35,direction),.65,4);
-      else view.span=clamp(view.span*Math.pow(.72,direction),1.3,150);
+      if(view.mode==='globe'){
+        view.mag=clamp(view.mag*Math.pow(1.35,direction),.65,4);
+        if(direction>0 && view.mag>2.35 && !data.activeRegionId && data.onSelectRegion){
+          const cam=camera(view,width,height),focus=cam.project(view.lon,view.lat);
+          let nearest=null,distance=Math.min(width,height)*.14;
+          for(const region of data.regions||[]){
+            const anchor=geo.center(region)||geo.regionBounds(region);
+            if(!anchor)continue;
+            const pos=cam.project(anchor.lon,anchor.lat),d=Math.hypot(pos.x-focus.x,pos.y-focus.y);
+            if(pos.z>0 && d<distance){nearest=region;distance=d;}
+          }
+          if(nearest){data.onSelectRegion(String(nearest.mpa_id));return;}
+        }
+      }else view.span=clamp(view.span*Math.pow(.72,direction),1.3,150);
       dirty();
     }
-    const areaBtn=button('Fit map to the selected area','Area',()=>reset('area',false,true));
+    const areaBtn=button('Fit map to the selected area','Area',()=>reset('area',data.historyMode,true,data.historyMode,true));
     const globeBtn=button('Show the 3D globe','Globe',openGlobe);
     modes.append(globeBtn,areaBtn);
     tools.append(button('Zoom in','+',()=>zoom(1)),button('Zoom out','−',()=>zoom(-1)),button('Reset map view','⌖',()=>data.vesselMode?openGlobe():reset(view.mode)));
@@ -407,6 +465,8 @@
       // At zoomed levels a one-degree graticule has thousands of projected segments.
       grid(ctx,cam,moving && view.mode==='area' ? {...view,span:Math.max(16,view.span)} : view);
       perimeter(ctx,cam,data.map);
+      layers.draw(cam,view,data.activeRegionId,data.historyMode,data.markerPoints);
+      for(const pair of data.gaps||[])geoLine(ctx,cam,pair,'rgba(233,191,131,.78)',1.4,[5,5]);
       drawContext(ctx,cam);
       drawLabels(ctx,cam);
       locator.hidden=view.mode==='globe'||width<410||height<265;
@@ -481,6 +541,17 @@
           ships?(group.points.every(p=>p.vesselType==='gear')?'gear':
           group.points.every(p=>p.vesselType!=='gear')?'ship':'contacts'):
           data.historyMode?'history':'observation';
+        const riskLevel=point.riskLevel || point.risk_level;
+        if(ships && riskLevel && Object.hasOwn(geo.colors,riskLevel)){
+          btn.dataset.vesselRisk=riskLevel;
+          btn.style.setProperty('--ship-tone',geo.colors[riskLevel]);
+          const score=Number(point.riskScore ?? point.risk_score);
+          btn.style.setProperty('--ship-size',(14+Math.round(clamp(Number.isFinite(score)?score:0,0,100)*.11))+'px');
+          btn.dataset.queued=String(group.points.every(p=>p.status==='queued'));
+        }else{
+          delete btn.dataset.vesselRisk;delete btn.dataset.queued;
+          btn.style.removeProperty('--ship-tone');btn.style.removeProperty('--ship-size');
+        }
         btn.style.left=group.x+'px';btn.style.top=group.y+'px';
         const name=latest ? (count>1?'Latest position of '+vesselLabel(point)+' and '+(count-1)+' nearby recorded '+(count===2?'position':'positions'):'Open latest position of '+vesselLabel(point)) :
           ships ? (count>1?'Choose from '+count+' nearby contacts':'Open '+vesselLabel(point)) :
@@ -581,6 +652,11 @@
       const points=(next.points||[]).filter(validLocation);
       const contextPoints=(next.contextPoints||[]).filter(validLocation);
       const wasVessel=Boolean(data.vesselMode);
+      const oldRegion=data.activeRegionId;
+      const activeRegionId=String(next.activeRegionId??'');
+      const regions=next.regions||[];
+      const activeRegion=regions.find(region=>String(region.mpa_id)===activeRegionId);
+      layers.setData(next.regions,next.globalNews);
       const historyMode=Boolean(next.vesselMode && !next.overview && (next.activeVesselKey||next.caseId||next.historyPoints?.length||next.focusPoint));
       const vesselAnchor=historyMode ? (next.vesselAnchor || contextPoints.find(p=>p.vesselKey===(next.activeVesselKey||next.caseId))) : null;
       let markerPoints=next.vesselMode ? (historyMode ? (next.historyPoints||points).filter(validLocation) :
@@ -597,18 +673,27 @@
         markerPoints.unshift(vesselAnchor);
       }
       const extent=next.vesselMode ? markerPoints : [...points,...contextPoints];
-      const key=JSON.stringify([next.area?.id,next.area?.center,next.activeVesselKey||next.caseId,next.map?.bounds,cameraScope(extent)]);
+      const key=JSON.stringify([activeRegionId,next.area?.id,next.area?.center,next.activeVesselKey||next.caseId,next.map?.bounds,cameraScope(extent)]);
       const wasHistory=Boolean(data.historyMode);
-      data={...next,points,contextPoints,markerPoints,historyMode,vesselAnchor};
+      const gaps=historyMode?gapSegments(markerPoints):[];
+      data={...next,points,contextPoints,markerPoints,historyMode,vesselAnchor,regions,activeRegionId,activeRegion,gaps};
+      gapKey.hidden=!gaps.length;
+      const displayedRegions=activeRegion ? [activeRegion] : regions;
+      const credits=[...new Set(displayedRegions.filter(region=>region.boundary?.coordinates?.length)
+        .map(region=>region.boundary_source).filter(source=>typeof source==='string' && source.trim()))];
+      boundaryCredit.textContent=credits.length?'Boundaries · '+credits.join(' / '):'';
       const scope=next.vesselMode ? (historyMode?markerPoints.length+' positions for this contact. ':
         contextPoints.length+' contacts with a reported position. ') :
         (Array.isArray(next.contextPoints)?contextPoints.length+' recorded positions in this selection. ':'');
       observationLayer.setAttribute('aria-label',next.vesselMode&&!historyMode?'Vessel and gear markers':'Recorded observation markers');
-      const fitLabel=historyMode?'Fit map to vessel history':contextPoints.length?'Fit map to filtered positions':'Fit map to the selected area';
+      const fitLabel=historyMode?'Fit map to vessel history':contextPoints.length?'Fit map to all filtered contacts':'Fit map to the selected area';
+      areaBtn.textContent=historyMode?'Fit history':activeRegionId?'Fit all':'Area';
       areaBtn.setAttribute('aria-label',fitLabel);areaBtn.title=fitLabel;
-      sr.textContent=(next.area?.name||'World')+'. '+scope+(points.length?points.map(p=>(p.label||'Observed position')+' '+coord(p.lat,true)+', '+coord(p.lon)).join('. '):'No selected positions.')+
-        (validBounds(data.map)?' Verified perimeter displayed.':' Verified perimeter unavailable.');
-      if(next.overview && (wasHistory || !signature || key!==signature)){signature=key;reset('globe',false,wasHistory);}
+      sr.textContent=(next.area?.name||'World')+'. '+scope+(historyMode ? points.map(p=>(p.label||'Observed position')+' '+coord(p.lat,true)+', '+coord(p.lon)).join('. ') : '')+
+        (credits.length||validBounds(data.map)?' Published perimeter displayed.':'');
+      if(activeRegionId && !historyMode && (oldRegion!==activeRegionId||wasHistory)){signature=key;reset('area',false,Boolean(oldRegion||wasHistory||wasVessel));}
+      else if(!activeRegionId && oldRegion && !historyMode){signature=key;reset('globe',false,true);}
+      else if(next.overview && !activeRegionId && (wasHistory || !signature || key!==signature)){signature=key;reset('globe',false,wasHistory);}
       else if(next.fitHistory && historyMode){signature=key;reset('area',true,wasVessel,true);}
       else if(!signature){signature=key;reset(next.focusArea?'area':'globe',Boolean(next.focusArea));}
       else if(next.focusArea){signature=key;reset('area',true,wasVessel);}
@@ -625,7 +710,7 @@
       if(e.button!==0||drag)return;
       closeChooser();flight=null;
       ignorePointerClick=false;
-      if(!e.target.closest('.mar-marker'))stage.focus({preventScroll:true});
+      if(!e.target.closest('.mar-marker, .mar-geography [role=button]'))stage.focus({preventScroll:true});
       drag={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};
       stage.classList.add('mar-dragging');
     });

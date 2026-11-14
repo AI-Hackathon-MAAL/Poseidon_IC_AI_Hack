@@ -1,0 +1,28 @@
+.mar-geography {position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;}
+.mar-geography [role=button] {cursor:pointer;pointer-events:visiblePainted;outline:none;}
+.geo-fill {fill:var(--area-tone);fill-opacity:.12;}
+.geo-stroke,.geo-ring {fill:none;stroke:var(--area-tone);stroke-width:1.55;stroke-linejoin:round;}
+.geo-ring {fill:var(--area-tone);fill-opacity:.12;}
+.geo-area:hover .geo-stroke,.geo-area:focus-visible .geo-stroke,
+.geo-area:hover .geo-ring,.geo-area:focus-visible .geo-ring {stroke:#f0f8ef;stroke-width:2.6;}
+.geo-area:hover .geo-fill,.geo-area:focus-visible .geo-fill {fill-opacity:.22;}
+.geo-name {fill:#e1ebe5;paint-order:stroke;stroke:#102027;stroke-width:3px;stroke-linejoin:round;font:500 10px Inter,"Segoe UI",sans-serif;}
+.geo-tag line {stroke:var(--area-tone);stroke-width:1;opacity:.8;}
+.geo-tag rect {fill:#182529;stroke:var(--area-tone);stroke-width:1;}
+.geo-tag text {fill:#e4ede6;font:500 10px Inter,"Segoe UI",sans-serif;}
+.geo-area:is(:hover,:focus-visible) .geo-tag rect {stroke:#e5f0eb;fill:#30423f;}
+.geo-news path {fill:#5cd6dd;stroke:#13363e;stroke-width:1.2;}
+.geo-news.country-level path {fill:#a0c4c8;fill-opacity:.75;}
+.geo-news.multiple path {stroke:#ccf4ef;stroke-width:1.8;}
+.geo-news:hover path,.geo-news:focus-visible path {stroke:white;stroke-width:2.5;}
+.geo-boundary-credit {position:absolute;z-index:2;bottom:26px;right:24px;max-width:38%;color:#b8c5bf;background:#142024d9;
+  font:9px/1.25 Inter,"Segoe UI",sans-serif;text-align:right;padding:2px 4px;pointer-events:none;}
+.geo-boundary-credit:empty {display:none;}
+.mar-marker[data-vessel-risk] {border-color:var(--ship-tone);--marker:var(--ship-tone);}
+.mar-marker[data-vessel-risk]::before {width:var(--ship-size,18px);height:var(--ship-size,18px);background:var(--ship-tone);}
+.mar-marker[data-queued="true"] {background:transparent;border-style:dashed;}
+.mar-marker[data-queued="true"]::before {opacity:.65;}
+.mar-gap-key {position:absolute;bottom:26px;left:40px;border:0;color:#e8cda6;background:#142024d9;padding:2px 5px;
+  font:9px/1.35 Inter,"Segoe UI",sans-serif;pointer-events:none;}
+.mar-gap-key::before {content:"";display:inline-block;width:14px;margin-right:5px;border-top:1px dashed #e4b468;vertical-align:middle;}
+@media(max-width:759px){.geo-boundary-credit {right:15px;max-width:45%;}.mar-gap-key {left:15px;max-width:46%;}}

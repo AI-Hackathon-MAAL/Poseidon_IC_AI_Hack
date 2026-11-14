@@ -806,3 +806,13 @@ main > footer {
 .archive-page summary { cursor: pointer; font-size: 16px; }
 .archive-page small { display: block; margin-top: 4px; font: 11px/1.5 var(--mono); color: var(--muted); }
 .archive-page a { color: var(--cyan); }
+#drill-path:not([hidden]) { display:flex; flex-wrap:wrap; align-items:center; gap:6px; color:var(--muted); margin:0 0 9px; font:10px/1.5 var(--mono); }
+#drill-path button { color:var(--cyan); background:transparent; border:0; border-bottom:1px solid currentColor; padding:1px 0; font:inherit; }
+#drill-path [aria-current] { color:var(--ink); }
+@media (max-width:600px) {
+  .topbar { gap:12px; padding-inline:14px; }
+  .topbar nav { gap:13px; }
+  .topbar nav button { font-size:11px; }
+  .topbar nav button span { display:none; }
+  .topbar:has(.synthetic-label) { flex-wrap:wrap; height:auto; min-height:52px; padding-block:6px; }
+}
