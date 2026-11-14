@@ -51,13 +51,29 @@
     return Array.isArray(b) && b.length === 4 && b.every(Number.isFinite) &&
       b[0] >= -180 && b[2] <= 180 && b[0] < b[2] && b[1] >= -90 && b[3] <= 90 && b[1] < b[3];
   }
+  function areaAnchor(area) {
+    if (validLocation(area?.center)) return area.center;
+    return Object.hasOwn(regionalCenters, area?.id) ? regionalCenters[area.id] : null;
+  }
+  function markerColors(point) {
+    if (point.role === 'gap-start' || (!point.role && point.label === 'Last signal')) {
+      return ['#ffbb6e', 'rgba(255,186,109,.45)'];
+    }
+    if (point.role === 'gap-end' || (!point.role && point.label === 'Signal resumed')) {
+      return ['#a0f5e7', 'rgba(145,239,224,.45)'];
+    }
+    return ['#abcde5', 'rgba(171,205,229,.45)'];
+  }
   function fit(data, width, height) {
     const points = [...data.points];
     if (validBounds(data.map)) {
       const [w,s,e,n] = data.map.bounds;
       points.push({lon:w,lat:s}, {lon:e,lat:n});
     }
-    if (!points.length) return regionalCenters[data.area?.id] || {lon:0,lat:15,span:140};
+    if (!points.length) {
+      const anchor = areaAnchor(data.area);
+      return anchor ? {lon:anchor.lon,lat:anchor.lat,span:anchor.span||25} : {lon:0,lat:15,span:140};
+    }
     const reference = points[0].lon;
     const lons = points.map(p => reference + wrap(p.lon-reference));
     const lats = points.map(p => p.lat);
@@ -279,12 +295,17 @@
       const collides=(r)=>occupied.some(o=>r.x<o.x+o.w&&r.x+r.w>o.x&&r.y<o.y+o.h&&r.y+r.h>o.y);
       const areaCenter=validBounds(data.map)
         ? {lon:(data.map.bounds[0]+data.map.bounds[2])/2,lat:(data.map.bounds[1]+data.map.bounds[3])/2}
-        : regionalCenters[data.area?.id];
-      const target=areaCenter?cam.project(areaCenter.lon,areaCenter.lat):null;
-      const showCallout=view.mode==='globe'&&target&&target.z>.25&&inside(target)&&Boolean(data.area?.name);
+        : areaAnchor(data.area);
+      const markers=data.points.map(point=>({p:cam.project(point.lon,point.lat),point})).filter(({p})=>inside(p));
+      const observation=areaCenter ? null : markers.find(({p})=>p.z>.25);
+      const target=areaCenter ? cam.project(areaCenter.lon,areaCenter.lat) : observation?.p;
+      const showCallout=Boolean(view.mode==='globe'&&target&&target.z>.25&&inside(target)&&(observation||data.area?.name));
       regionCallout.hidden=!showCallout;
       if(showCallout){
-        calloutName.textContent=data.area.name;
+        calloutType.textContent=observation?'Vessel observation':'Protected area';
+        calloutName.textContent=observation ? observation.point.label||'Recorded position' : data.area.name;
+        const action=observation?'Focus on recorded positions':'Inspect the selected protected area';
+        regionCallout.title=action;regionCallout.setAttribute('aria-label',action);
         const labelWidth=regionCallout.offsetWidth;
         const placeRight=target.x+64+labelWidth<width-18;
         const px=clamp(placeRight?target.x+49:target.x-49-labelWidth,5,width-labelWidth-5);
@@ -315,13 +336,13 @@
         }
       }
       const compact=view.mode==='globe' || view.span>35;
-      const markers=data.points.map((point,index)=>({p:cam.project(point.lon,point.lat),point,index})).filter(({p})=>inside(p));
       for(const {p} of markers) occupied.push({x:p.x-7,y:p.y-7,w:14,h:14});
-      for(const {p,point,index} of markers) {
-        const tone=index===0?'#ffbb6e':'#a0f5e7';
-        ctx.beginPath();ctx.arc(p.x,p.y,10,0,2*Math.PI);ctx.strokeStyle=index===0?'rgba(255,186,109,.45)':'rgba(145,239,224,.45)';ctx.lineWidth=1;ctx.stroke();
+      for(const {p,point} of markers) {
+        const [tone,ring]=markerColors(point);
+        ctx.beginPath();ctx.arc(p.x,p.y,10,0,2*Math.PI);ctx.strokeStyle=ring;ctx.lineWidth=1;ctx.stroke();
         ctx.beginPath();ctx.arc(p.x,p.y,5,0,2*Math.PI);ctx.fillStyle=tone;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#13252d';ctx.stroke();
-        if(!compact||markers.length===1)label(p,point.label||'Observed position',tone,{back:true});
+        if((!compact||markers.length===1)&&!(showCallout&&observation?.point===point))
+          label(p,point.label||'Observed position',tone,{back:true});
       }
       if(!compact) {
         for(const island of data.map?.islands||[]) {
@@ -354,7 +375,7 @@
     }
     function update(next) {
       const points=(next.points||[]).filter(validLocation);
-      const key=JSON.stringify([next.area?.id,next.caseId,next.map?.bounds,points]);
+      const key=JSON.stringify([next.area?.id,next.area?.center,next.caseId,next.map?.bounds,points]);
       data={...next,points};
       sr.textContent=(next.area?.name||'World')+'. '+(points.length?points.map(p=>(p.label||'Observed position')+' '+coord(p.lat,true)+', '+coord(p.lon)).join('. '):'No observed vessel positions.')+
         (validBounds(data.map)?' Verified perimeter displayed.':' Verified perimeter unavailable.');

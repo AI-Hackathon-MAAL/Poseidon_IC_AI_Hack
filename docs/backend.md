@@ -4,22 +4,21 @@ Poseidon watches marine protected areas (MPAs) for vessels with gaps in vessel t
 inside them, investigates each one, and writes a cited brief. This page is the contract between the
 backend (`notebooks/poseidon`) and the front end.
 
-**Start here:** `data/poseidon_snapshot.sample.json` is a synthetic example of the exact JSON the
-backend produces. Build against it now; swap in the real file later with no code changes.
+**Start here:** `data/poseidon_snapshot.json` contains the team’s real export. It is a saved historical run collection, not a live feed. The synthetic fixture, `data/poseidon_snapshot.sample.json`, is only for tests.
 
 Every case is a **lead for review, not proof**. Show `disclaimer` and `attribution` somewhere visible.
 
 ## 1. Opening the monitor
 
-Run `npm start` in this checkout and open `http://127.0.0.1:3000/monitor`. The Node server exposes the notebook contract as `GET /api/snapshot`. With the bundled fixture the monitor labels the vessels and model decisions as synthetic. A refresh reads the latest export. History and Live in the case list filter existing investigations. Use the notebook or a scheduled job to launch a new run.
+Run `npm start` in this checkout and open `http://127.0.0.1:3000/`. The original Poseidon globe reads the notebook contract from `GET /api/snapshot`; old `/monitor` bookmarks lead to the same globe. Select an area and case, then **Open brief** to inspect the exported findings, sources, news and agent decisions in the evidence drawer. The bundled export contains 74 Galápagos cases and 19 Hermandad cases from three historical runs (14 November 2026 export). The page opens on the latest run’s area. A tracking gap is a gap in reception; transmitters classified as gear do not identify a fishing vessel. A browser refresh reads the latest export. In **Date**, filter by observation date or by the investigation's history/live mode. These controls select existing cases; use the notebook or a scheduled job to launch a new run. Published historical replays remain available at `/archive`.
 
-**Use a local export.** Download `poseidon_snapshot.json` from the notebook's export volume. In PowerShell set `$env:POSEIDON_SNAPSHOT_PATH = 'C:/path/to/poseidon_snapshot.json'` before starting the server. An unavailable configured export returns HTTP 503. The server reports `X-Poseidon-Source: sample` for the bundled example or `export` for a configured file or volume. Check the JSON provenance to identify synthetic notebook exports too.
+**Use a local export.** Download `poseidon_snapshot.json` from the notebook's export volume. In PowerShell set `$env:POSEIDON_SNAPSHOT_PATH = 'C:/path/to/poseidon_snapshot.json'` before starting the server. An unavailable configured export returns HTTP 503. The server reports `X-Poseidon-Source: bundled-export` for the checked-in notebook output or `export` for a configured file or volume. Newer notebooks include explicit source flags. The bundled file predates those flags and is retained as supplied.
 
 **Use the monitor inside Databricks.**
 
 1. Run `notebooks/poseidon` in the Git folder. Choose `data_source=sample` for synthetic vessels or `gfw` for Global Fishing Watch. For the latter, the notebook uses the secrets `hackathon/gfw_token` and, for Linkup, `hackathon/linkup_key`. The default output is `/Volumes/workspace/poseidon/exports/poseidon_snapshot.json` for real data and `/Volumes/workspace/poseidon_sample/exports/poseidon_snapshot.json` for the sample.
 2. Create a Databricks App for this repository root. Add a Unity Catalog volume resource named `poseidon-exports` with read access to the desired exports volume. Deploy the root containing `app.yaml`, `package.json` and `server.mjs`.
-3. Open the app. Its service principal reads the export through the workspace Files API. The browser requests only the app's own `/api/snapshot`. To see new results after a notebook run, choose **Refresh snapshot**.
+3. Open the app. Its service principal reads the export through the workspace Files API. The browser requests only the app's own `/api/snapshot`. Refresh the page to see the newly exported cases after a notebook run.
 
 Databricks documents the app's [volume resource path](https://docs.databricks.com/aws/en/dev-tools/databricks-apps/environment-variables), [service principal authentication](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m) and [file download API](https://docs.databricks.com/api/workspace/files/download).
 

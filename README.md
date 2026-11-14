@@ -4,7 +4,7 @@ An autonomous agent on Databricks that watches Marine Protected Areas (MPAs) for
 
 ## Open the investigation monitor
 
-Run `npm start` with Node.js 22 or newer and open [the monitor](http://127.0.0.1:3000/monitor). The monitor shows the notebook's latest export, with the run window, vessel cases, tool decisions, scored evidence, and cited regional news. The local default uses a clearly marked synthetic example. To view a downloaded export, set `POSEIDON_SNAPSHOT_PATH` to its local path before starting the server. The [historical globe](http://127.0.0.1:3000/archive) opens the separate published-case replay.
+Run `npm start` with Node.js 22 or newer and open [Poseidon](http://127.0.0.1:3000/). The original globe, case queue, and evidence drawer display the notebook's latest export. Pick a protected area, select a vessel case, then choose **Open brief** to read the agent's findings, sources and decisions. **Date** filters by observation dates and by history or live run. The default is the team's saved Databricks export in `data/poseidon_snapshot.json`. It contains historical Global Fishing Watch observations for the Galápagos and Hermandad marine reserves; opening the site does not start a live run. To view a downloaded export, set `POSEIDON_SNAPSHOT_PATH` to its local path before starting the server. The [published historical archive](http://127.0.0.1:3000/archive) remains available in the same interface through **About**.
 
 For a Databricks-hosted monitor, deploy this repository root as a Databricks App with the volume resource described in [the backend contract](docs/backend.md).
 
@@ -98,7 +98,7 @@ A separate scheduled notebook (`notebooks/03_live_mpa_monitor.py`) supports roll
 | `agent/` | Agent loop, tools, prompts, and live monitor client |
 | `public/`, `server.mjs` | Globe, investigation monitor, and server API |
 | `app/` | Original front-end handoff notes |
-| `data/` | Small **synthetic** sample data for testing without API keys |
+| `data/` | Real notebook export, published archive records, and separate synthetic test fixtures |
 | `docs/schema.md` | Table schemas the agent and front end agree on |
 | `docs/live-monitor.md` | Setup and scheduling notes for `03_live_mpa_monitor.py` |
 | `tests/` | Unit tests (Poseidon agent and the earlier live monitor) |
@@ -149,7 +149,7 @@ Install Node.js 22 or newer. The application has no npm dependencies.
 npm start
 ```
 
-Open `http://127.0.0.1:3000`. To run the checks, use `npm test`. Set the environment variable `PORT` to change the listening port. The default run uses six public historical cases, a rules-based investigator and local JSON brief storage in the ignored `.soundings/briefs/` directory. It needs no credentials and makes no outside requests.
+Open `http://127.0.0.1:3000/archive` for the published replay. To run the checks, use `npm test`. Set the environment variable `PORT` to change the listening port. This archive includes six public historical cases, a rules-based investigator and local JSON brief storage in the ignored `.soundings/briefs/` directory. Its local replay needs no credentials.
 
 ## The first investigation
 

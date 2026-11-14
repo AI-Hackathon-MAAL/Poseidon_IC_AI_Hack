@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
-const sampleFile = new URL('./data/poseidon_snapshot.sample.json', import.meta.url);
+const bundledExport = new URL('./data/poseidon_snapshot.json', import.meta.url);
 
 function workspaceOrigin(value) {
   const url = new URL(value?.includes('://') ? value : 'https://' + value);
@@ -56,8 +56,8 @@ export function createSnapshotReader(env = process.env, fetchImpl = fetch) {
   return async () => {
     if (env.POSEIDON_VOLUME) return {source: 'export', data: validateSnapshot(await fromVolume())};
     if (env.DATABRICKS_APP_NAME && !env.POSEIDON_SNAPSHOT_PATH) throw new Error('Missing app volume.');
-    const path = env.POSEIDON_SNAPSHOT_PATH || sampleFile;
+    const path = env.POSEIDON_SNAPSHOT_PATH || bundledExport;
     const data = JSON.parse((await readFile(path, 'utf8')).replace(/^\uFEFF/, ''));
-    return {source: env.POSEIDON_SNAPSHOT_PATH ? 'export' : 'sample', data: validateSnapshot(data)};
+    return {source: env.POSEIDON_SNAPSHOT_PATH ? 'export' : 'bundled-export', data: validateSnapshot(data)};
   };
 }

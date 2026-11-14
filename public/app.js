@@ -1,5 +1,6 @@
 const $ = id => document.getElementById(id);
 let catalog;
+let overlapsObservationDates;
 let selected;
 let running = false;
 let selectionVersion = 0;
@@ -36,6 +37,7 @@ function date(value) {
   return `${day} · ${parsed.toISOString().slice(11, 19)} UTC`;
 }
 function casePeriod(record) {
+  if (record.periodIsWindow) return 'Run window · ' + [record.date, record.endDate].filter((d, i, all) => d && all.indexOf(d) === i).map(date).join(' – ');
   return record.kind === 'Annual estimate' ? record.date.slice(0,4) + ' · annual estimate' : date(record.date);
 }
 function mapData() {
@@ -54,7 +56,11 @@ function drawMap(points = [], focusArea = false) {
   } else {
     $('map').replaceChildren(make('p', 'Map unavailable. The case evidence remains available below.', 'queue-empty'));
   }
-  $('map-caption').textContent = points.length
+  $('map-caption').textContent = catalog.snapshot
+    ? (points.some(point => point.role?.startsWith('gap-'))
+      ? 'Reported positions · Route during the gap unknown'
+      : points.length ? 'Reported event positions' : 'No event positions available')
+    : points.length
     ? 'Recorded positions · Route during the gap unknown'
     : map ? 'Protected-area context · Select a measured event for positions'
     : 'Regional context · Source report has no track-level coordinates';
@@ -66,13 +72,15 @@ function drawMap(points = [], focusArea = false) {
 function renderFacts(record) {
   $('case-facts').replaceChildren();
   const elapsedHours = (Date.parse(record.end) - Date.parse(record.start)) / 3600000;
-  const gapDuration = Number.isFinite(elapsedHours) && elapsedHours >= 0
+  const gapDuration = record.snapshotCase
+    ? (Number.isFinite(record.snapshotCase.longest_gap_hours) ? record.snapshotCase.longest_gap_hours + ' hours' : null)
+    : Number.isFinite(elapsedHours) && elapsedHours >= 0
     ? elapsedHours.toFixed(2) + ' hours'
     : Number.isFinite(record.datasetHours) ? record.datasetHours.toFixed(2) + ' hours (archive)' : null;
   const facts = [
-    ['Vessel', record.vessel],
-    ['Record period', record.kind === 'Annual estimate' ? record.date.slice(0,4) : date(record.date).split(' · ')[0]],
-    ['Reporting gap', gapDuration],
+    [record.vesselType === 'gear' ? 'Tracked gear' : 'Vessel', record.vessel],
+    [record.periodIsWindow ? 'Run window starts' : 'Record period', record.kind === 'Annual estimate' ? record.date.slice(0,4) : date(record.date).split(' · ')[0]],
+    [record.snapshotCase ? 'Longest gap' : 'Reporting gap', gapDuration],
     ['Recorded positions', record.mapPoints?.length ? String(record.mapPoints.length) : null]
   ];
   for (const [label, value] of facts) {
@@ -104,7 +112,7 @@ function selectCase(record, focusArea = false) {
     button.setAttribute('aria-pressed', String(active));
   });
   $('case-title').textContent = record.title || record.vessel;
-  $('case-kind').textContent = (record.synthetic ? 'Simulated control · ' : '') + (record.kind || 'Historical record');
+  $('case-kind').textContent = (record.synthetic ? (record.snapshotCase ? 'Synthetic sample · ' : 'Simulated control · ') : '') + (record.kind || 'Historical record');
   $('case-meta').textContent = [record.vessel, casePeriod(record), typeof record.location === 'string' ? record.location : null].filter(Boolean).join(' · ');
   $('investigate').disabled = false;
   $('investigate-label').textContent = 'Run investigation';
@@ -116,6 +124,10 @@ function selectCase(record, focusArea = false) {
   renderFacts(record);
   drawMap(record.mapPoints || [], focusArea);
   const version = ++selectionVersion;
+  if (record.snapshotCase) {
+    $('investigate-label').textContent = record.snapshotCase.status === 'queued' ? 'View case' : 'Open brief';
+    return;
+  }
   fetch('/api/briefs/' + encodeURIComponent(record.id)).then(async response => {
     if (!response.ok) return;
     const saved = await response.json();
@@ -129,6 +141,16 @@ function renderQueue() {
   const area = catalog.areas.find(area => area.id === $('area').value);
   $('map-title').textContent = area?.name || 'Protected waters';
   $('area-summary').textContent = area?.summary || '';
+  if (catalog.snapshot) {
+    const data = catalog.snapshot;
+    const region = data.mpas.find(row => String(row.mpa_id) === area?.id);
+    const window = data.latest_run;
+    const runAreas = window?.mpa_names?.join(', ');
+    const notes = [region?.rules_summary, data.attribution, data.disclaimer,
+      window?.window_start && window?.window_end && 'Latest exported run' + (runAreas ? ' (' + runAreas + ')' : '') + ': ' + (window.mode || 'investigation') + ', ' + date(window.window_start) + ' – ' + date(window.window_end) + '.'];
+    for (const note of notes.filter(Boolean)) $('area-summary').append(make('br'), document.createTextNode(note));
+    for (const source of region?.rules_sources || []) $('area-summary').append(make('br'), safeLink(source.title || 'Area rules', source.url));
+  }
   $('footer-area').textContent = area?.name?.toUpperCase() || 'POSEIDON';
   const from = $('date-from').value;
   const through = $('date-to').value;
@@ -136,6 +158,8 @@ function renderQueue() {
   $('filter-error').textContent = invalidRange ? 'Choose an end date on or after the start date.' : '';
   const cases = catalog.cases.filter(record => {
     if (invalidRange || record.areaId !== $('area').value) return false;
+    if (catalog.snapshot && $('case-mode').value && record.mode !== $('case-mode').value) return false;
+    if (catalog.snapshot) return overlapsObservationDates(record, from, through);
     const start = String(record.date || '').slice(0, 10);
     const end = String(record.endDate || record.date || '').slice(0, 10);
     return (!from || end >= from) && (!through || start <= through);
@@ -146,17 +170,18 @@ function renderQueue() {
     const button = make('button', null, 'case');
     button.type = 'button';
     button.dataset.id = String(record.id);
-    button.append(make('span', record.synthetic ? 'Simulated control' : record.kind || 'Historical event', 'type'), make('strong', record.title || record.vessel), make('span', record.vessel, 'case-vessel'), make('small', casePeriod(record)));
+    button.append(make('span', record.synthetic && !record.snapshotCase ? 'Simulated control' : record.kind || 'Historical event', 'type'), make('strong', record.title || record.vessel), make('span', record.vessel, 'case-vessel'), make('small', casePeriod(record)));
     if (record.priority != null) button.append(make('span', record.priority, 'queue-priority'));
     button.addEventListener('click', () => selectCase(record, true));
     $('cases').append(button);
   }
   if (cases.length) selectCase(cases[0]);else {
+    ++selectionVersion;
     selected = null;
     $('investigate').disabled = true;
-    $('cases').append(make('p', 'No cases overlap this date range. Adjust the dates to explore the archive.', 'queue-empty'));
+    $('cases').append(make('p', catalog.snapshot ? 'No cases match this selection in the current export.' : 'No cases overlap this date range. Adjust the dates to explore the archive.', 'queue-empty'));
     $('case-title').textContent = 'No candidate events';
-    $('case-kind').textContent = 'Historical records';
+    $('case-kind').textContent = catalog.snapshot ? catalog.origin : 'Historical records';
     $('case-meta').textContent = 'Select another area or expand the date range.';
     $('status').textContent = '';
     $('timeline').replaceChildren();
@@ -235,6 +260,11 @@ function renderBrief(brief) {
 }
 $('investigate').addEventListener('click', async () => {
   if (!selected || running) return;
+  if (selected.snapshotCase) {
+    renderSnapshotBrief(selected, catalog);
+    openEvidenceDrawer();
+    return;
+  }
   running = true;
   openEvidenceDrawer();
   document.querySelector('.activity-panel').open = true;
@@ -285,27 +315,55 @@ $('investigate').addEventListener('click', async () => {
 $('area').addEventListener('change', renderQueue);
 $('date-from').addEventListener('change', renderQueue);
 $('date-to').addEventListener('change', renderQueue);
+$('case-mode').addEventListener('change', renderQueue);
 async function initialize() {
+  const archive = location.pathname === '/archive';
+  $('date-toggle').disabled = true;
+  $('area').disabled = true;
+  if (archive) {
+    $('other-workspace').href = '/';
+    $('other-workspace').textContent = 'Open the latest notebook export ↗';
+    $('footer-provenance').textContent = 'Historical observations · Human review required';
+  } else {
+    $('about-workflow').textContent = 'Poseidon investigates vessel activity in protected waters. Select a case to see the evidence, sources and checks recorded by the agent. New investigations run in Databricks; refresh this page after a run to see its export.';
+    $('date-from').value = '';
+    $('date-to').value = '';
+    $('mode-filter').hidden = false;
+  }
   try {
-    const response = await fetch('/api/catalog');
-    if (!response.ok) throw new Error('Unable to load the case catalog. Refresh to try again.');
-    catalog = await response.json();
-    $('data-mode').textContent = catalog.origin === 'Databricks' ? 'Databricks records' : 'Published archive';
+    const response = await fetch(archive ? '/api/catalog' : '/api/snapshot', {cache: 'no-store'});
+    if (!response.ok) throw new Error(archive ? 'Case catalog unavailable.' : 'The notebook export is unavailable. Check the export, then refresh.');
+    const data = await response.json();
+    if (archive) catalog = data;
+    else {
+      const adapter = await import('/snapshot-workspace.mjs');
+      overlapsObservationDates = adapter.overlapsObservationDates;
+      catalog = adapter.snapshotCatalog(data, response.headers.get('X-Poseidon-Source'));
+    }
+    $('data-mode').textContent = archive ? (catalog.origin === 'Databricks' ? 'Databricks records' : 'Published archive') : catalog.origin;
+    if (!archive) $('footer-provenance').textContent = catalog.origin + ' · Human review required';
     $('area').replaceChildren();
     for (const area of catalog.areas) {
       const option = make('option', area.name);
       option.value = area.id;
       $('area').append(option);
     }
-    $('focus-area').disabled = false;
+    const latestArea = catalog.snapshot?.latest_run?.mpa_ids?.map(String).find(id => catalog.areas.some(area => area.id === id));
+    if (latestArea) $('area').value = latestArea;
+    $('date-toggle').disabled = false;
+    $('focus-area').disabled = $('area').disabled = !catalog.areas.length;
     renderQueue();
   } catch (error) {
     $('status').className = 'status error';
     $('status').textContent = error.message;
     $('area').replaceChildren(make('option', 'Catalog unavailable'));
     $('area').disabled = true;
-    $('data-mode').textContent = 'Archive unavailable';
-    $('cases').replaceChildren(make('p', 'Case catalog unavailable. Refresh the page to reconnect.', 'queue-empty'));
+    $('data-mode').textContent = archive ? 'Archive unavailable' : 'Export unavailable';
+    $('case-count').textContent = '—';
+    $('case-title').textContent = archive ? 'Archive unavailable' : 'Export unavailable';
+    $('case-meta').textContent = 'Refresh the page to reconnect.';
+    $('cases').replaceChildren(make('p', archive ? 'Case catalog unavailable. Refresh the page to reconnect.' : 'Unable to read the notebook export. Refresh after the export is available.', 'queue-empty'));
+    $('map-caption').textContent = 'No observations loaded';
   }
 }
 initialize();

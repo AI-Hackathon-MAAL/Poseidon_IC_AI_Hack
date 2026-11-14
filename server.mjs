@@ -11,9 +11,8 @@ const root = fileURLToPath(new URL('./', import.meta.url));
 const assets = new Map([
   ['/', ['index.html', 'text/html']],
   ['/archive', ['index.html', 'text/html']],
-  ['/monitor', ['monitor.html', 'text/html']],
-  ['/monitor.js', ['monitor.js', 'text/javascript']],
-  ['/monitor.css', ['monitor.css', 'text/css']],
+  ['/snapshot-workspace.mjs', ['snapshot-workspace.mjs', 'text/javascript']],
+  ['/snapshot-drawer.js', ['snapshot-drawer.js', 'text/javascript']],
   ['/poseidon.svg', ['poseidon.svg', 'image/svg+xml']],
   ['/app.js', ['app.js', 'text/javascript']],
   ['/style.css', ['style.css', 'text/css']],
@@ -68,8 +67,8 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
     res.setHeader('Referrer-Policy','no-referrer');
     const path = (req.url || '/').split('?')[0];
     try {
-      if (req.method === 'GET' && path === '/' && process.env.DATABRICKS_APP_NAME) {
-        return res.writeHead(302, {Location: '/monitor'}).end();
+      if (req.method === 'GET' && (path === '/monitor' || path === '/monitor/')) {
+        return res.writeHead(302, {Location: '/', 'Cache-Control': 'no-store'}).end();
       }
       if (req.method === 'GET' && path === '/api/snapshot') {
         try {

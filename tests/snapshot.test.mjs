@@ -4,20 +4,28 @@ import {createSnapshotReader} from '../snapshot.mjs';
 import {createApp} from '../server.mjs';
 
 test('monitor reads the notebook contract and fails visibly if a configured export is missing', async t => {
-  const readSample = createSnapshotReader({});
-  const sample = await readSample();
-  assert.equal(sample.source, 'sample');
-  assert.equal(sample.data.synthetic, true);
-  const cases = sample.data.cases;
-  assert.ok(cases.some(c => c.longest_gap_hours === 100 && c.steps.length > 0 && c.brief_markdown));
+  const readBundled = createSnapshotReader({});
+  const {source, data} = await readBundled();
+  assert.equal(source, 'bundled-export');
+  assert.notEqual(data.synthetic, true);
+  assert.match(data.attribution, /Global Fishing Watch/);
+  assert.ok(data.mpas.every(area => !String(area.mpa_id).startsWith('sample-')));
   const missing = createSnapshotReader({POSEIDON_SNAPSHOT_PATH: new URL('./absent.json', import.meta.url)});
-  let reader = readSample;
+  let reader = readBundled;
   const app = createApp({readSnapshot: () => reader()});
   await new Promise((resolve, reject) => { app.once('error', reject); app.listen(0, '127.0.0.1', resolve); });
   t.after(() => new Promise(resolve => app.close(resolve)));
   const url = 'http://127.0.0.1:' + app.address().port + '/api/snapshot';
+  const bookmark = await fetch(new URL('/monitor', url), {redirect: 'manual'});
+  assert.equal(bookmark.status, 302);
+  assert.equal(bookmark.headers.get('location'), '/');
+  for (const path of ['/', '/archive']) {
+    const page = await fetch(new URL(path, url));
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /id="brief-dialog" class="evidence-drawer"/);
+  }
   const good = await fetch(url);
-  assert.equal(good.headers.get('X-Poseidon-Source'), 'sample');
+  assert.equal(good.headers.get('X-Poseidon-Source'), 'bundled-export');
   assert.equal((await good.json()).product, 'Poseidon');
   reader = missing;
   const unavailable = await fetch(url);
