@@ -64,10 +64,12 @@ dbutils.widgets.text("llm_endpoint", "auto")
 dbutils.widgets.text("catalog", "workspace")
 dbutils.widgets.text("schema", "poseidon")
 dbutils.widgets.dropdown("reset_tables", "false", ["false", "true"])
+dbutils.widgets.dropdown("snapshot_to_repo", "true", ["true", "false"])
 
 W = {k: dbutils.widgets.get(k).strip() for k in
      ["mode", "start_date", "end_date", "lookback_days", "mpa_search", "mpa_ids", "max_cases", "max_steps", "focus",
-      "force_reinvestigate", "data_source", "search_provider", "llm_endpoint", "catalog", "schema", "reset_tables"]}
+      "force_reinvestigate", "data_source", "search_provider", "llm_endpoint", "catalog", "schema", "reset_tables",
+      "snapshot_to_repo"]}
 CATALOG, SCHEMA = W["catalog"], W["schema"]
 if not all(x.replace("_", "").isalnum() for x in (CATALOG, SCHEMA)):
     raise ValueError("catalog and schema may only contain letters, numbers and underscores")
@@ -294,6 +296,16 @@ try:
     print(f"Snapshot written: {path}  ({len(snapshot_json) // 1024} KB, {len(snapshot['cases'])} cases)")
 except Exception as e:
     print(f"Could not write the snapshot file ({str(e)[:200]}). The tables are still up to date.")
+
+if W["snapshot_to_repo"] == "true":
+    # Copy into this Git folder so it can be committed and pushed for the front end
+    repo_file = repo / "data" / ("poseidon_snapshot.sample.json" if SAMPLE else "poseidon_snapshot.json")
+    try:
+        repo_file.write_text(snapshot_json, encoding="utf-8")
+        print(f"Snapshot copied into the Git folder: {repo_file}")
+        print("To share it: click the branch name (main) at the top -> tick this file -> Commit & Push.")
+    except Exception as e:
+        print(f"Could not copy the snapshot into the Git folder ({str(e)[:200]}).")
 
 # COMMAND ----------
 

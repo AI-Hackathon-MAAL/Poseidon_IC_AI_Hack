@@ -13,6 +13,7 @@ Every case is a **lead for review, not proof**. Show `disclaimer` and `attributi
 
 | Way | What you get | When to use |
 | --- | --- | --- |
+| `data/poseidon_snapshot.json` in GitHub | The latest real snapshot, committed from Databricks | Easiest for the front end: just pull the repo |
 | Snapshot file | One JSON document with everything | Simplest. Written on every run to `/Volumes/workspace/poseidon/exports/poseidon_snapshot.json` (download it from Catalog Explorer and bundle it with the app) |
 | Delta tables | `workspace.poseidon.*` (section 4) | A Databricks App, dashboard or Genie space reading live |
 
@@ -140,6 +141,7 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 | `search_provider` | `linkup`, `tavily` or `none` |
 | `llm_endpoint` | `auto` finds a working chat model in the workspace |
 | `reset_tables` | Drops every Poseidon table first. Set back to `false` afterwards |
+| `snapshot_to_repo` | Also writes `data/poseidon_snapshot.json` into the Git folder, ready to commit and push |
 
 **Live monitoring:** create a Databricks Job with this notebook as its task, parameters `mode=live`,
 schedule hourly, max concurrent runs 1. Because the agent remembers cases, a scheduled run only
