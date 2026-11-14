@@ -1,4 +1,30 @@
-# Dark Fishing Watch — Imperial AI Hackathon
+# Poseidon — protector of the sea (Imperial AI Hackathon)
+
+An autonomous agent on Databricks that watches Marine Protected Areas (MPAs) for vessels that go dark, investigates them, and writes cited briefs.
+
+## Poseidon: the current system
+
+**Run `notebooks/poseidon`.** One notebook, two modes that differ only by time window:
+
+| Mode | Window | Use |
+| --- | --- | --- |
+| `history` | `start_date` to `end_date` | Investigate a past period |
+| `live` | Last `lookback_days` days up to now | Scheduled monitoring (hourly Databricks Job) |
+
+What makes it an agent rather than a pipeline:
+
+1. **Triage** — ranks every vessel-in-area case (new evidence, long or repeated gaps, fishing, unnamed vessels) and works down the list within a budget.
+2. **Chooses its own checks** — for each case a language model picks the next tool (identity lookup, activity before/after the gap, 12-month history, encounter partner, Linkup web searches on the vessel, its owner, the area's rules and recent news) and decides when the evidence is sufficient.
+3. **Adapts** — failed checks are recorded, temporary outages retried once, and a case that cannot be completed is marked `incomplete` with what remains unknown.
+4. **Remembers** — unchanged cases are skipped on later runs; cases with new events are reopened.
+5. **Stays auditable** — scores, durations and the complete/incomplete verdict come from code and source data, never from the model. Every step records who decided (`llm` or `policy`) and why.
+
+Front end: read **[docs/backend.md](docs/backend.md)** and build against `data/poseidon_snapshot.sample.json` (synthetic, same shape as the real output). Tables live in `workspace.poseidon`.
+
+Secrets (scope `hackathon`): `gfw_token` (required), `linkup_key` (web search).
+
+The sections below describe the earlier pipeline (`00`–`03` notebooks, `agent/`), which Poseidon supersedes. They still run.
+
 
 A Databricks and Python pipeline for investigating suspected illegal fishing inside Marine Protected Areas (MPAs).
 
@@ -56,13 +82,17 @@ A separate scheduled notebook (`notebooks/03_live_mpa_monitor.py`) supports roll
 
 | Path | What it is |
 | --- | --- |
+| `notebooks/poseidon.py` | **The Poseidon notebook** (history + live modes) |
+| `poseidon/` | Poseidon package: GFW client, Linkup search, agent loop, scoring, briefs, data contract |
+| `docs/backend.md` | Front-end contract: snapshot shape, tables, fields |
+| `scripts/make_sample_snapshot.py` | Regenerates the synthetic sample snapshot |
 | `notebooks/` | Databricks notebooks (source format — import via Workspace > Import, or Git folder) |
 | `agent/` | Agent loop, tools, prompts, and live monitor client |
 | `app/` | Front end (built from the Figma frames) |
 | `data/` | Small **synthetic** sample data for testing without API keys |
 | `docs/schema.md` | Table schemas the agent and front end agree on |
 | `docs/live-monitor.md` | Setup and scheduling notes for `03_live_mpa_monitor.py` |
-| `tests/` | Unit tests for the live monitor |
+| `tests/` | Unit tests (Poseidon agent and the earlier live monitor) |
 
 ## Setup
 

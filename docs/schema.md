@@ -1,3 +1,5 @@
+> **Superseded.** These are the tables of the earlier `00`–`03` pipeline. Poseidon's tables and the front-end contract are in [backend.md](backend.md).
+
 # Table schemas
 
 All tables live in `<catalog>.<schema>` — default `workspace.dark_fishing`.

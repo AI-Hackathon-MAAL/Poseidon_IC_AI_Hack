@@ -1,0 +1,321 @@
+# Databricks notebook source
+# MAGIC %md
+# MAGIC # Poseidon — protector of the sea
+# MAGIC
+# MAGIC One notebook, two modes. The only difference between them is the time window.
+# MAGIC
+# MAGIC | mode | window | use it for |
+# MAGIC | --- | --- | --- |
+# MAGIC | `history` | `start_date` to `end_date` | investigating a past period |
+# MAGIC | `live` | the last `lookback_days` days up to now | scheduled monitoring (run it as an hourly Job) |
+# MAGIC
+# MAGIC Each run: fetch Global Fishing Watch events → triage the vessels (skipping ones it already investigated,
+# MAGIC unless new evidence arrived) → for each case the agent chooses its own checks, one at a time, until it
+# MAGIC judges the evidence sufficient → code scores the case → a cited brief is written.
+# MAGIC
+# MAGIC **Secrets** (scope `hackathon`): `gfw_token` (required), `linkup_key` (web search; optional but recommended).
+# MAGIC Open this notebook from inside the Git folder. Tables are documented in `docs/backend.md`.
+# MAGIC
+# MAGIC Data © Global Fishing Watch (apparent activity; non-commercial use). Every case is a lead, not proof.
+
+# COMMAND ----------
+
+import sys, json, html
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+roots = [Path.cwd(), *Path.cwd().parents]
+try:  # Databricks can run a notebook with a working directory outside the Git folder
+    nb_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    here = Path("/Workspace") / nb_path.lstrip("/")
+    roots = [here.parent, *here.parent.parents, *roots]
+except Exception:
+    pass
+repo = next((r for r in roots if (r / "poseidon" / "agent.py").is_file()), None)
+if repo is None:
+    raise RuntimeError("Open this notebook inside the Imperial-AI-Hackathon Git folder (Pull main first). "
+                       "The poseidon/ folder must sit next to notebooks/.")
+if str(repo) not in sys.path:
+    sys.path.insert(0, str(repo))
+for name in [m for m in sys.modules if m == "poseidon" or m.startswith("poseidon.")]:
+    del sys.modules[name]   # pick up freshly pulled code without restarting
+
+from poseidon import contract, pipeline, sample
+from poseidon.agent import Context
+from poseidon.gfw import GFWClient, resolve_window
+from poseidon.search import SearchClient
+print("Poseidon code loaded from", repo)
+
+# COMMAND ----------
+
+dbutils.widgets.dropdown("mode", "history", ["history", "live"])
+dbutils.widgets.text("start_date", "2026-08-01")
+dbutils.widgets.text("end_date", "2026-11-14")
+dbutils.widgets.text("lookback_days", "30")
+dbutils.widgets.text("mpa_search", "Galapagos")
+dbutils.widgets.text("mpa_ids", "11753")
+dbutils.widgets.text("max_cases", "5")
+dbutils.widgets.text("max_steps", "8")
+dbutils.widgets.text("focus", "")
+dbutils.widgets.dropdown("force_reinvestigate", "false", ["false", "true"])
+dbutils.widgets.dropdown("data_source", "gfw", ["gfw", "sample"])
+dbutils.widgets.dropdown("search_provider", "linkup", ["linkup", "tavily", "none"])
+dbutils.widgets.text("llm_endpoint", "auto")
+dbutils.widgets.text("catalog", "workspace")
+dbutils.widgets.text("schema", "poseidon")
+dbutils.widgets.dropdown("reset_tables", "false", ["false", "true"])
+
+W = {k: dbutils.widgets.get(k).strip() for k in
+     ["mode", "start_date", "end_date", "lookback_days", "mpa_search", "mpa_ids", "max_cases", "max_steps", "focus",
+      "force_reinvestigate", "data_source", "search_provider", "llm_endpoint", "catalog", "schema", "reset_tables"]}
+CATALOG, SCHEMA = W["catalog"], W["schema"]
+if not all(x.replace("_", "").isalnum() for x in (CATALOG, SCHEMA)):
+    raise ValueError("catalog and schema may only contain letters, numbers and underscores")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{SCHEMA}")
+try:  # let teammates read and write; only the schema owner can grant, so failure is fine
+    spark.sql(f"GRANT ALL PRIVILEGES ON SCHEMA {CATALOG}.{SCHEMA} TO `account users`")
+except Exception as e:
+    print("(could not grant schema access to the team; the schema owner can run the GRANT)")
+try:
+    spark.conf.set("spark.sql.session.timeZone", "UTC")
+except Exception:
+    pass
+
+# COMMAND ----------
+
+# MAGIC %md ## Connect: Global Fishing Watch, Linkup, language model
+
+# COMMAND ----------
+
+def secret(key):
+    try:
+        return dbutils.secrets.get("hackathon", key)
+    except Exception:
+        return None
+
+SAMPLE = W["data_source"] == "sample"
+if SAMPLE:
+    gfw, search = sample.SampleGFW(), sample.SampleSearch()
+    print("data_source = sample: using SYNTHETIC vessels and sources (no keys needed).")
+else:
+    gfw = GFWClient(secret("gfw_token"))
+    search = None
+    if W["search_provider"] != "none":
+        key = secret(f"{W['search_provider']}_key")
+        if key:
+            search = SearchClient(key, provider=W["search_provider"])
+            print("Web search:", W["search_provider"])
+        else:
+            print(f"WARNING: secret hackathon/{W['search_provider']}_key is not set. The agent will run without web search.")
+
+# COMMAND ----------
+
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
+
+w = WorkspaceClient()
+
+def _text(content):
+    if isinstance(content, list):   # some models return a list of content blocks
+        return "".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type", "text") == "text")
+    return content or ""
+
+def chat(endpoint, system, user, max_tokens=1500):
+    try:
+        resp = w.serving_endpoints.query(
+            name=endpoint, max_tokens=max_tokens, temperature=0.1,
+            messages=[ChatMessage(role=ChatMessageRole.SYSTEM, content=system),
+                      ChatMessage(role=ChatMessageRole.USER, content=user)])
+        return _text(resp.choices[0].message.content)
+    except Exception as first:
+        try:   # fall back to the raw REST call without optional parameters
+            resp = w.api_client.do("POST", f"/serving-endpoints/{endpoint}/invocations",
+                                   body={"messages": [{"role": "system", "content": system},
+                                                      {"role": "user", "content": user}], "max_tokens": max_tokens})
+            return _text(resp["choices"][0]["message"]["content"])
+        except Exception:
+            raise first
+
+def pick_endpoint():
+    """Use the widget value, or find a chat model that actually answers in this workspace."""
+    if W["llm_endpoint"].lower() not in ("", "auto"):
+        candidates = [W["llm_endpoint"]]
+    else:
+        endpoints = [e for e in w.serving_endpoints.list() if e.name.startswith("databricks-")]
+        names = [e.name for e in endpoints if (getattr(e, "task", "") or "") == "llm/v1/chat"]
+        if not names:   # task not reported: keep everything that is not an embedding model
+            names = [e.name for e in endpoints if not any(x in e.name for x in ("embedding", "gte", "bge"))]
+        prefer = ["claude-sonnet", "claude", "gpt-5", "llama-4", "llama-3-3-70b", "llama", "gemini", "gemma", "qwen", "gpt"]
+        rank = lambda n: next((i for i, p in enumerate(prefer) if p in n), len(prefer))
+        candidates = sorted(names, key=lambda n: (rank(n), [-ord(c) for c in n]))[:8]
+        print("Chat endpoints found:", candidates or "none")
+    for name in candidates:
+        try:
+            if chat(name, "You are a connectivity test.", "Reply with the single word: ready", max_tokens=20):
+                return name
+        except Exception as e:
+            print(f"  {name}: not usable ({str(e)[:120]})")
+    return None
+
+LLM_ENDPOINT = pick_endpoint()
+if LLM_ENDPOINT:
+    llm = lambda system, user: chat(LLM_ENDPOINT, system, user)
+    print("Language model:", LLM_ENDPOINT, "(chooses the agent's next check and writes briefs)")
+else:
+    llm = None
+    print("WARNING: no chat model is available. The rule-based policy will choose checks and briefs use the template.")
+
+# COMMAND ----------
+
+# MAGIC %md ## Choose the window and the protected areas
+
+# COMMAND ----------
+
+if SAMPLE:
+    window_start, window_end = "2026-10-01", "2026-10-31"
+    mpas = pipeline.select_mpas(sample.SAMPLE_MPAS, search="sample")
+else:
+    window_start, window_end = resolve_window(W["mode"], W["start_date"], W["end_date"], W["lookback_days"])
+    mpas = pipeline.select_mpas(gfw.mpas(), search=W["mpa_search"], ids=W["mpa_ids"])
+print(f"Mode: {W['mode']}   Window: {window_start} to {window_end}")
+print("Protected areas:")
+for m in mpas:
+    print(f"  {m['mpa_id']}  {m['mpa_name']}")
+if not mpas:
+    dbutils.notebook.exit("No protected area matched. Change mpa_search or set mpa_ids.")
+if len(mpas) > 5:
+    print(f"NOTE: {len(mpas)} areas matched; using the first 5. Set mpa_ids to choose.")
+    mpas = mpas[:5]
+
+# COMMAND ----------
+
+# MAGIC %md ## Run the agent
+# MAGIC The log shows every decision: `[llm]` means the model chose that check, `[policy]` means the rule-based fallback did.
+
+# COMMAND ----------
+
+def table(name):
+    return f"{CATALOG}.{SCHEMA}.{name}"
+
+def read_rows(name):
+    """Table -> list of dicts with timestamps as ISO strings."""
+    if not spark.catalog.tableExists(table(name)):
+        return []
+    out = []
+    for r in spark.table(table(name)).collect():
+        d = r.asDict()
+        for k, v in d.items():
+            if hasattr(v, "isoformat"):
+                d[k] = v.replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+        out.append(d)
+    return out
+
+if W["reset_tables"] == "true":
+    for name in contract.TABLES:
+        spark.sql(f"DROP TABLE IF EXISTS {table(name)}")
+    print("All Poseidon tables dropped (reset_tables = true). Set it back to false.")
+
+memory = pipeline.memory_from_rows(read_rows("cases"))
+print(f"Memory: {len(memory)} case(s) remembered from earlier runs\n")
+
+ctx = Context(gfw=gfw, search=search, llm=llm, window_start=window_start, window_end=window_end,
+              mode=W["mode"], max_steps=int(W["max_steps"]))
+result = pipeline.run(ctx, mpas, memory=memory, max_cases=int(W["max_cases"]),
+                      force=W["force_reinvestigate"] == "true",
+                      focus=[f for f in W["focus"].split(",") if f.strip()], llm_endpoint=LLM_ENDPOINT)
+run_row = result["run"][0]
+print(f"\nRun {run_row['run_id']}: {run_row['n_investigated']} investigated, {run_row['n_skipped_unchanged']} unchanged, "
+      f"{run_row['n_queued']} queued. Decisions: {run_row['llm_decisions']} by model, {run_row['policy_decisions']} by policy.")
+for note in run_row["notes"]:
+    print("NOTE:", note)
+
+# COMMAND ----------
+
+# MAGIC %md ## Save to the tables the front end reads
+
+# COMMAND ----------
+
+from pyspark.sql import functions as F
+from pyspark.sql.types import StructType, StructField, StringType
+
+SPARK_TYPE = {"string": "string", "json": "string", "int": "int", "double": "double",
+              "boolean": "boolean", "timestamp": "timestamp"}
+
+def save(name, rows, overwrite=False):
+    spec = contract.TABLES[name]
+    if not rows and not overwrite:
+        print(f"  {name}: nothing new")
+        return
+    raw = spark.createDataFrame(contract.to_table_rows(name, rows),
+                                StructType([StructField(c, StringType(), True) for c, _ in spec["columns"]]))
+    # try_cast: a malformed value becomes null instead of failing the whole run
+    df = raw.select([F.expr(f"try_cast(`{c}` AS {SPARK_TYPE[t]})").alias(c) for c, t in spec["columns"]])
+    if overwrite or not spark.catalog.tableExists(table(name)):
+        df.write.mode("overwrite").option("overwriteSchema", "true").saveAsTable(table(name))
+    else:
+        view = f"_poseidon_new_{name}"
+        df.createOrReplaceTempView(view)
+        on = " AND ".join(f"t.{k} <=> s.{k}" for k in spec["key"])
+        tail = f"INTO {table(name)} t USING {view} s ON {on} WHEN MATCHED THEN UPDATE SET * WHEN NOT MATCHED THEN INSERT *"
+        try:
+            spark.sql("MERGE WITH SCHEMA EVOLUTION " + tail)
+        except Exception:
+            spark.sql("MERGE " + tail)
+    print(f"  {name}: {len(rows)} row(s) written")
+
+save("events", result["events"])
+save("cases", result["cases"])
+save("agent_steps", result["steps"])
+save("runs", result["run"])
+save("news", result["news"])
+save("mpa_context", result["mpa_context"])
+
+all_cases, all_events = read_rows("cases"), read_rows("events")
+save("mpa_status", contract.mpa_status_rows(all_cases, all_events), overwrite=True)
+
+# COMMAND ----------
+
+# MAGIC %md ## Snapshot for the front end
+# MAGIC One JSON document with everything (cases with their events and agent steps, area status, news, latest run).
+
+# COMMAND ----------
+
+from datetime import datetime, timezone
+
+snapshot = contract.build_snapshot(read_rows("runs"), all_cases, all_events, read_rows("agent_steps"),
+                                   read_rows("news"), read_rows("mpa_context"),
+                                   datetime.now(timezone.utc).isoformat(timespec="seconds"))
+snapshot_json = json.dumps(snapshot, default=str, ensure_ascii=False, indent=1)
+try:
+    spark.sql(f"CREATE VOLUME IF NOT EXISTS {CATALOG}.{SCHEMA}.exports")
+    path = f"/Volumes/{CATALOG}/{SCHEMA}/exports/poseidon_snapshot.json"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(snapshot_json)
+    print(f"Snapshot written: {path}  ({len(snapshot_json) // 1024} KB, {len(snapshot['cases'])} cases)")
+except Exception as e:
+    print(f"Could not write the snapshot file ({str(e)[:200]}). The tables are still up to date.")
+
+# COMMAND ----------
+
+# MAGIC %md ## Results
+
+# COMMAND ----------
+
+display(spark.sql(f"""
+    SELECT risk_score, risk_level, confidence, status, vessel_name, flag, mpa_name, headline, change,
+           n_steps, llm_decisions, policy_decisions, investigated_at
+    FROM {table('cases')} ORDER BY risk_score DESC, investigated_at DESC"""))
+
+# COMMAND ----------
+
+this_run = [c for c in result["cases"] if c["brief_markdown"]]
+if this_run:
+    top = max(this_run, key=lambda c: c["risk_score"])
+    steps = [s for s in result["steps"] if s["case_id"] == top["case_id"]]
+    trail = "\n".join(f"{s['step_no']}. [{s['decided_by']}] {s['tool']} - {s['reason']}\n     -> {s['result']}" for s in steps)
+    displayHTML("<h3>How the agent investigated the top case of this run</h3><pre style='white-space:pre-wrap'>"
+                + html.escape(trail) + "</pre><h3>Brief</h3><pre style='white-space:pre-wrap'>"
+                + html.escape(top["brief_markdown"]) + "</pre>")
+else:
+    print("No new investigations in this run: every case was already investigated and nothing changed. "
+          "Set force_reinvestigate to true, or widen the window, to investigate again.")
