@@ -7,7 +7,24 @@
 # COMMAND ----------
 import os, sys, json, uuid, html, unicodedata
 from datetime import datetime, timezone
-sys.path.insert(0, os.path.abspath('../agent'))
+from pathlib import Path
+
+# Databricks can run notebooks with a working directory outside the Git folder.
+roots = [Path.cwd(), *Path.cwd().parents]
+try:
+    notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    workspace_path = Path('/Workspace') / notebook_path.lstrip('/')
+    roots = [workspace_path.parent, *workspace_path.parent.parents, *roots]
+except Exception:
+    pass  # Local execution and runtimes without the notebook context API.
+agent_dir = next((root / 'agent' for root in roots
+                  if (root / 'agent' / 'live_monitor.py').is_file()), None)
+if agent_dir is None:
+    raise RuntimeError(
+        'Open this notebook inside the synced Imperial-AI-Hackathon Git folder. '
+        'Pull main and confirm agent/live_monitor.py exists alongside notebooks/. '
+        'Do not copy the notebook into a separate workspace folder.')
+sys.path.insert(0, str(agent_dir))
 from live_monitor import GFWClient, DATASETS, window, flatten, assess
 import dark_fishing_agent as agent
 
