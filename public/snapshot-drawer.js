@@ -32,13 +32,13 @@ function renderSnapshotBrief(record, catalog) {
 
   // The trusted citation targets come from the export's numbered source records.
   // Prose and inline Markdown URLs never supply DOM markup or link destinations.
-  function appendText(target, value) {
+  function appendText(target, value, citations = sources) {
     const text = value.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
       .replace(/^_(.+)_$/, '$1')
       .replace(/\*\*([^*]+)\*\*|\*([^*]+)\*/g, (_, bold, italic) => bold || italic);
     for (const part of text.split(/(\[\d+\])/)) {
       const match = /^\[(\d+)\]$/.exec(part);
-      const source = match && sources.find(item => String(item.n) === match[1]);
+      const source = match && citations.find(item => String(item.n) === match[1]);
       if (source) {
         const citation = safeLink(part, source.url);
         citation.title = source.title || 'Case source';
@@ -52,25 +52,25 @@ function renderSnapshotBrief(record, catalog) {
     }
   }
 
-  function appendLines(lines) {
+  function appendLines(lines, container = body, citations = sources) {
     let list;
     for (const line of lines) {
       const bullet = /^(?:[-*+] |\d+[.)] )(.+)$/.exec(line);
       if (bullet) {
         if (!list) {
           list = make('ul');
-          body.append(list);
+          container.append(list);
         }
         const item = make('li');
         const observation = /^(\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2}))\s*(?:[:—–-]\s*)?(.+)$/.exec(bullet[1]);
         if (observation) item.append(make('span', date(observation[1]), 'observation-date'));
-        appendText(item, observation ? observation[2] : bullet[1]);
+        appendText(item, observation ? observation[2] : bullet[1], citations);
         list.append(item);
       } else if (line) {
         list = null;
         const paragraph = make('p');
-        appendText(paragraph, line);
-        body.append(paragraph);
+        appendText(paragraph, line, citations);
+        container.append(paragraph);
       } else {
         list = null;
       }
@@ -143,9 +143,39 @@ function renderSnapshotBrief(record, catalog) {
   if (!events.length) measured.append(make('div', 'No measured events were attached to this case.'));
   body.append(measured);
 
+  const area = rows(snapshot.mpas).find(item => item.mpa_id != null && String(item.mpa_id) === String(data.mpa_id));
+  const rules = make('section');
+  const areaName = area?.mpa_name || data.mpa_name || 'Area unavailable';
+  rules.append(make('h3', 'Protected-area rules'), make('strong', areaName));
+  const ruleSummary = typeof area?.rules_summary === 'string' ? area.rules_summary.trim() : '';
+  const ruleSources = rows(area?.rules_sources).map((source, i) => ({...source, n: source.n ?? i + 1}));
+  if (ruleSummary) {
+    rules.append(make('p', 'Regional context from the exported investigation.'));
+    appendLines(ruleSummary.split(/\r?\n/).map(line => line.trim()), rules, ruleSources);
+    rules.append(make('p', 'For case review, check the recorded positions, event dates, gear and authorizations against the applicable zone and official instrument.'));
+  } else {
+    rules.append(make('p', 'This export contains no rule summary for this protected area.'));
+  }
+  if (ruleSources.length) {
+    const referencesPanel = make('details', null, 'runtime');
+    referencesPanel.append(make('summary', `Sources for area rules · ${ruleSources.length}`));
+    const references = make('ol', null, 'sources');
+    for (const source of ruleSources) {
+      const item = make('li');
+      item.value = source.n;
+      item.append(safeLink(source.title || 'Rule source', source.url));
+      references.append(item);
+    }
+    referencesPanel.append(references);
+    rules.append(referencesPanel);
+  } else if (ruleSummary) {
+    rules.append(make('p', 'The export provides no supporting source links for this summary.'));
+  }
+
   // Some exports place original cited analysis here; newer exports insert the bibliography.
   // Render only the structured source records as links, preserving any separate prose or caveat.
   for (const section of sections) {
+    if (/^(suggested )?next steps?$/i.test(section.title)) body.append(rules);
     const sourceSection = /^(what public sources say|sources)$/i.test(section.title);
     const content = sourceSection ? section.lines.filter(line =>
       !/^(?:[-*+]\s+\[\d+\]\s+|\d+[.)]\s+)\[.+\]\(.+\)$/.test(line)
@@ -159,6 +189,7 @@ function renderSnapshotBrief(record, catalog) {
       appendLines(content);
     }
   }
+  if (!rules.parentNode) body.append(rules);
   if (!sections.some(section => /what we don['’]t know|unknowns|what remains unknown/i.test(section.title))) {
     body.append(make('h3', 'What remains unknown'));
     const unknowns = rows(data.unknowns);

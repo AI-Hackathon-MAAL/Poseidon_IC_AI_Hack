@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import {validatePublishedExport} from './public/published-export.mjs';
 
 const bundledExport = new URL('./data/poseidon_snapshot.json', import.meta.url);
 
@@ -10,16 +11,6 @@ function workspaceOrigin(value) {
     throw new Error('Invalid Databricks workspace host.');
   }
   return url.origin;
-}
-
-function validateSnapshot(data) {
-  const lists = ['cases', 'mpas', 'news', 'runs'];
-  if (data?.product !== 'Poseidon' || !lists.every(key => Array.isArray(data[key])) ||
-      !Object.hasOwn(data, 'latest_run') || !data.cases.every(row => typeof row?.case_id === 'string') ||
-      !data.mpas.every(row => row?.mpa_id != null)) {
-    throw new Error('Invalid Poseidon snapshot.');
-  }
-  return data;
 }
 
 // Local demos read an export from disk. A Databricks App reads the same file
@@ -54,10 +45,10 @@ export function createSnapshotReader(env = process.env, fetchImpl = fetch) {
     return response.json();
   }
   return async () => {
-    if (env.POSEIDON_VOLUME) return {source: 'export', data: validateSnapshot(await fromVolume())};
+    if (env.POSEIDON_VOLUME) return {source: 'export', data: validatePublishedExport(await fromVolume())};
     if (env.DATABRICKS_APP_NAME && !env.POSEIDON_SNAPSHOT_PATH) throw new Error('Missing app volume.');
     const path = env.POSEIDON_SNAPSHOT_PATH || bundledExport;
     const data = JSON.parse((await readFile(path, 'utf8')).replace(/^\uFEFF/, ''));
-    return {source: env.POSEIDON_SNAPSHOT_PATH ? 'export' : 'bundled-export', data: validateSnapshot(data)};
+    return {source: env.POSEIDON_SNAPSHOT_PATH ? 'export' : 'bundled-export', data: validatePublishedExport(data)};
   };
 }

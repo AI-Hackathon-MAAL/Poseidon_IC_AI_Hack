@@ -16,10 +16,18 @@ function caseEvents(row) {
 
 function mapPoints(row, events) {
   const points = [];
-  function add(lat, lon, role, label) {
-    if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-      points.push({lat, lon, role, label});
+  function add(lat, lon, role, label, event) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return;
+    const point = {lat, lon, role, label};
+    if (event) {
+      point.eventId = event.event_id;
+      point.eventType = event.event_type;
+      point.startTime = event.start_time;
+      point.endTime = event.end_time;
+      point.markerTime = role === 'gap-end' ? event.end_time : event.start_time;
+      point.durationHours = event.duration_hours;
     }
+    points.push(point);
   }
   const multipleGaps = events.filter(event => event.event_type === 'gap').length > 1;
   let gapNumber = 0;
@@ -27,10 +35,10 @@ function mapPoints(row, events) {
     if (event.event_type === 'gap') {
       gapNumber++;
       const prefix = multipleGaps ? `Gap ${gapNumber} · ` : '';
-      add(event.lat, event.lon, 'gap-start', prefix + 'Reported gap position');
-      add(event.end_lat, event.end_lon, 'gap-end', prefix + 'Signal resumed');
+      add(event.lat, event.lon, 'gap-start', prefix + 'Reported gap position', event);
+      add(event.end_lat, event.end_lon, 'gap-end', prefix + 'Signal resumed', event);
     } else {
-      add(event.lat, event.lon, 'event', eventNames[event.event_type] || 'Event position');
+      add(event.lat, event.lon, 'event', eventNames[event.event_type] || 'Event position', event);
     }
   }
   if (!points.length) add(row.lat, row.lon, 'event', 'Reported case position');

@@ -10,7 +10,7 @@ Every case is a **lead for review, not proof**. Show `disclaimer` and `attributi
 
 ## 1. Opening the monitor
 
-Run `npm start` in this checkout and open `http://127.0.0.1:3000/`. The original Poseidon globe reads the notebook contract from `GET /api/snapshot`; old `/monitor` bookmarks lead to the same globe. Select an area and case, then **Open brief** to inspect the exported findings, sources, news and agent decisions in the evidence drawer. The bundled export contains 74 Galápagos cases and 19 Hermandad cases from three historical runs (14 November 2026 export). The page opens on the latest run’s area. A tracking gap is a gap in reception; transmitters classified as gear do not identify a fishing vessel. A browser refresh reads the latest export. In **Date**, filter by observation date or by the investigation's history/live mode. These controls select existing cases; use the notebook or a scheduled job to launch a new run. Published historical replays remain available at `/archive`.
+Run `npm start` in this checkout and open `http://127.0.0.1:3000/`. The original Poseidon globe reads the notebook contract from `GET /api/snapshot`; old `/monitor` bookmarks lead to the same globe. Select a globe marker or case to inspect an observation and open a published agent report. Each numbered circle groups recorded positions at the current zoom. The explorer opens on all published areas. On 14 November 2026 the bundled export contained 74 Galápagos cases and 19 Hermandad cases across three historical runs. The publication date records when Poseidon wrote the export; each marker shows the UTC time of the observation. **Filters** selects matching cases by observation date, investigation mode or status. **Refresh** reloads the configured export, and the visible workspace checks every minute. Published historical replays remain available at `/archive`.
 
 | Way | What you get | When to use |
 | --- | --- | --- |
@@ -155,9 +155,9 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 
 The unified notebook uses ordinary reruns to switch modes and sources. Older runs with no source label remain in storage. The monitor and case memory use source-tagged runs, so older cases are investigated again when selected. The case list shows the most recently stored investigation for each vessel and area. Its mapped events are the ones used in that investigation.
 
-**Live monitoring:** create a Databricks Job with this notebook as its task, parameters `mode=live`,
-schedule hourly, max concurrent runs 1. Because the agent remembers cases, a scheduled run only
-investigates vessels that are new or have new events.
+**Hourly GFW publication.** Use [the Jobs API template](../deploy/poseidon-hourly.job.json) to schedule the existing workspace notebook. In a copy, replace `notebook_path` with the path of the team's notebook in its Databricks Git folder. Set up the notebook credentials and app volume binding above, then run `databricks jobs create --json "@path/to/your-job.json"` once using your workspace profile. The template checks Galápagos and Hermandad hourly over a rolling 30-day window, investigates up to five cases per run and publishes to the Unity Catalog volume. Unchanged cases use saved evidence. Confirm the first publication by checking `generated_at` on the app’s `/api/snapshot`. Running the local preview serves the repository copy until a newer file or the volume is configured.
+
+**Vessel photographs.** A case may include an optional `vessel_photo` object with `vessel_id` or `imo`, `image_url`, `source_url`, `credit` and `license`. If a separately granted permission allows display under a non-open license, supply `display_permitted: true`. Where available, GFW provides [registry photos and copyright via the Vessels API](https://globalfishingwatch.org/platform-update/2025-march-vessel-viewer-and-vessels-api-new-vessel-identity-fields-from-tmt/). The existing export contains no photos.
 
 ## 6. What "autonomous" means here
 

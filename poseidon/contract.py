@@ -102,7 +102,12 @@ def to_table_rows(table, rows):
 def parse_row(table, row):
     """Table row (JSON columns as strings) -> plain dict with JSON columns parsed."""
     out = dict(row)
-    for c in json_columns(table):
+    columns = json_columns(table)
+    # An enriched Delta cases table can include a rights-cleared photograph.
+    # Keep it reader-only so routine notebook writes preserve the enrichment.
+    if table == "cases" and "vessel_photo" in out:
+        columns.append("vessel_photo")
+    for c in columns:
         if isinstance(out.get(c), str):
             try:
                 out[c] = json.loads(out[c])

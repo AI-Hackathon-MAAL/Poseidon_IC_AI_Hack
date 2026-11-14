@@ -290,7 +290,12 @@ class Contract(unittest.TestCase):
         out = run(make_ctx())
         stringly = [dict(zip([c for c, _ in contract.TABLES["cases"]["columns"]], t))
                     for t in contract.to_table_rows("cases", out["cases"])]
+        photo = {"vessel_id":stringly[0]["vessel_id"], "image_url":"https://registry.example/vessel.jpg",
+                 "source_url":"https://registry.example/ship", "credit":"Vessel registry",
+                 "license":"CC BY 4.0", "display_permitted":True}
+        stringly[0]["vessel_photo"] = json.dumps(photo)
         snap = contract.build_snapshot(out["run"], stringly, out["events"], out["steps"], [], [], "now")
+        self.assertEqual(next(c for c in snap["cases"] if c["vessel_id"] == photo["vessel_id"])["vessel_photo"], photo)
         self.assertIsInstance(snap["cases"][0]["reasons"], list)
         self.assertEqual(snap["mpas"][0]["top_risk_score"], case(out, "sample-vessel-dark")["risk_score"])
 

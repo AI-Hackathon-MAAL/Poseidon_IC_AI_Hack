@@ -12,6 +12,8 @@ const assets = new Map([
   ['/', ['index.html', 'text/html']],
   ['/archive', ['index.html', 'text/html']],
   ['/snapshot-workspace.mjs', ['snapshot-workspace.mjs', 'text/javascript']],
+  ...['case-query', 'published-export', 'vessel-photo', 'globe-workspace'].map(name =>
+    ['/' + name + '.mjs', [name + '.mjs', 'text/javascript']]),
   ['/snapshot-drawer.js', ['snapshot-drawer.js', 'text/javascript']],
   ['/poseidon.svg', ['poseidon.svg', 'image/svg+xml']],
   ['/app.js', ['app.js', 'text/javascript']],

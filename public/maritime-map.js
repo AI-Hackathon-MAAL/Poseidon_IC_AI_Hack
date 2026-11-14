@@ -64,8 +64,8 @@
     }
     return ['#abcde5', 'rgba(171,205,229,.45)'];
   }
-  function fit(data, width, height) {
-    const points = [...data.points];
+  function fit(data, width, height, positions) {
+    const points = [...positions];
     if (validBounds(data.map)) {
       const [w,s,e,n] = data.map.bounds;
       points.push({lon:w,lat:s}, {lon:e,lat:n});
@@ -74,11 +74,16 @@
       const anchor = areaAnchor(data.area);
       return anchor ? {lon:anchor.lon,lat:anchor.lat,span:anchor.span||25} : {lon:0,lat:15,span:140};
     }
-    const reference = points[0].lon;
-    const lons = points.map(p => reference + wrap(p.lon-reference));
-    const lats = points.map(p => p.lat);
-    const west = Math.min(...lons), east = Math.max(...lons);
-    const south = Math.min(...lats), north = Math.max(...lats);
+    const lons = points.map(p => p.lon).sort((a,b) => a-b);
+    let largestGap=-1, west=lons[0];
+    // Exclude the largest empty arc to fit observations spanning the date line.
+    for(let i=0;i<lons.length;i++) {
+      const next=i+1<lons.length ? lons[i+1] : lons[0]+360;
+      if(next-lons[i]>largestGap) { largestGap=next-lons[i]; west=next; }
+    }
+    const east=west+360-largestGap;
+    let south=90,north=-90;
+    for(const p of points){south=Math.min(south,p.lat);north=Math.max(north,p.lat);}
     const lat = (south + north) / 2, aspect = width / Math.max(1,height);
     const span = Math.max(12, (east-west)*Math.cos(lat*DEG)*1.65, (north-south)*aspect*1.6);
     return {lon:wrap((west+east)/2),lat,span:clamp(span,8,155)};
@@ -199,12 +204,44 @@
     const btn=el('button','mar-button',content);btn.type='button';btn.title=label;
     btn.setAttribute('aria-label',label);btn.addEventListener('click',click);return btn;
   }
+  function samePosition(a,b) {
+    return a && b && a.caseId===b.caseId && a.eventId===b.eventId && a.role===b.role &&
+      a.lon===b.lon && a.lat===b.lat;
+  }
+  function groupPositions(points,cam,focusPoint) {
+    const groups=[],cells=new Map(),spacing=36;
+    for(const point of points) {
+      const {x,y,z}=cam.project(point.lon,point.lat);
+      if(z<=0 || x<0 || y<0 || x>cam.w || y>cam.h)continue;
+      const col=Math.floor(x/spacing),row=Math.floor(y/spacing);
+      let closest,minimum=spacing;
+      for(let i=col-1;i<=col+1;i++)for(let j=row-1;j<=row+1;j++){
+        for(const g of cells.get(i+','+j)||[]){
+          const distance=Math.hypot(x-g.x,y-g.y);
+          if(distance<minimum){closest=g;minimum=distance;}
+        }
+      }
+      if(!closest){
+        closest={x,y,points:[],representative:point};
+        groups.push(closest);
+        const key=col+','+row;
+        if(!cells.has(key))cells.set(key,[]);
+        cells.get(key).push(closest);
+      }
+      closest.points.push(point);
+      if(samePosition(point,focusPoint))closest.focused=true;
+    }
+    return groups;
+  }
   function create(container) {
     const root=el('div','mar-view'), terrain=el('canvas','mar-raster'), overlay=el('canvas','mar-overlay');
     const stage=el('div','mar-stage');
     stage.tabIndex=0;stage.setAttribute('aria-label','Interactive 3D map. Drag or use arrow keys to orbit, plus and minus to zoom, Home to fit the area.');
     terrain.setAttribute('aria-hidden','true');overlay.setAttribute('aria-hidden','true');
-    stage.append(terrain,overlay);
+    const observationLayer=el('div','mar-observations');
+    observationLayer.setAttribute('role','group');
+    observationLayer.setAttribute('aria-label','Recorded observation markers');
+    stage.append(terrain,overlay,observationLayer);
     const modes=el('div','mar-modes'), tools=el('div','mar-tools');
     modes.setAttribute('role','group');modes.setAttribute('aria-label','Map view');
     tools.setAttribute('role','group');tools.setAttribute('aria-label','Map controls');
@@ -212,7 +249,7 @@
     attribution.href='https://www.naturalearthdata.com/downloads/50m-raster-data/50m-gray-earth/';
     attribution.target='_blank';attribution.rel='noopener noreferrer';
     const scale=el('span','mar-scale'), location=el('span','mar-location'), sr=el('span','mar-sr');
-    const regionCallout=button('Inspect the selected protected area','',()=>reset('area'));
+    const regionCallout=button('Inspect the selected protected area','',()=>reset('area',true));
     regionCallout.classList.add('mar-callout');
     const calloutType=el('span','mar-callout-type','Protected area');
     const calloutName=el('span','mar-callout-name');
@@ -226,17 +263,23 @@
     const textureState=el('div','mar-texture-state');
     readout.append(scale,location);root.append(stage,regionCallout,modes,tools,locator,readout,attribution,sr,textureState);container.replaceChildren(root);
 
-    let data={points:[]}, view={mode:'globe',lon:-108,lat:20,span:25,mag:1};
-    let frame=0,drag=null,width=1,height=1,world=null,pacific=null,signature='',didFit=false;
-    function reset(mode='area') {
-      const home=fit(data,width,height);
+    let data={points:[],contextPoints:[]}, view={mode:'globe',lon:-108,lat:20,span:25,mag:1};
+    let frame=0,drag=null,width=1,height=1,world=null,pacific=null,signature='';
+    let focusedCase=false,ignorePointerClick=false;
+    const markerButtons=[];
+    function reset(mode='area', focusCase=false) {
+      focusedCase=focusCase;
+      const overview=!focusCase && data.contextPoints.length>0;
+      const point=focusCase && validLocation(data.focusPoint) ? data.focusPoint : null;
+      const home=point ? {lon:point.lon,lat:point.lat,span:2.8} :
+        fit(data,width,height,overview ? data.contextPoints : data.points);
       view={mode,lon:home.lon,lat:home.lat,span:home.span,mag:1};
-      if(mode==='globe'){
+      if(mode==='globe'&&!overview){
         // Frame the park beside the North American coastline on the opening hemisphere.
         if(data.area?.id==='revillagigedo'){view.lon=-111;view.lat=20;}
         else {view.lon=wrap(home.lon+6);view.lat=clamp(home.lat+6,-80,80);}
       }
-      didFit=true; dirty();
+      dirty();
     }
     function zoom(direction) {
       if(view.mode==='globe') view.mag=clamp(view.mag*Math.pow(1.35,direction),.65,4);
@@ -260,6 +303,7 @@
       const ctx=overlay.getContext('2d'); if(!ctx)return;
       ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
       grid(ctx,cam,view);perimeter(ctx,cam,data.map);
+      drawContext(ctx,cam);
       drawLabels(ctx,cam);
       locator.hidden=view.mode==='globe'||width<410||height<265;
       if(!locator.hidden){
@@ -289,6 +333,44 @@
       scale.textContent=nice>=1?nice+' km':Math.round(nice*1000)+' m';
       location.textContent=coord(view.lat,true)+'  '+coord(view.lon);
     }
+    function drawContext(ctx,cam) {
+      if(!data.onSelectCase && data.contextPoints.length){
+        ctx.beginPath();
+        for(const point of data.contextPoints){
+          const p=cam.project(point.lon,point.lat);
+          if(p.z<=0 || p.x<0 || p.y<0 || p.x>width || p.y>height)continue;
+          ctx.moveTo(p.x+2,p.y);ctx.arc(p.x,p.y,2,0,Math.PI*2);
+        }
+        ctx.fillStyle='#80b8ab';ctx.fill();
+      }
+      // Put the selected observation first so its local marker stays precisely on its coordinate.
+      const groups=groupPositions(data.markerPoints||[],cam,data.focusPoint);
+      for(let i=0;i<groups.length;i++) {
+        const group=groups[i], count=group.points.length, point=group.representative;
+        let btn=markerButtons[i];
+        if(!btn){
+          btn=el('button','mar-marker');
+          btn.type='button';
+          btn.addEventListener('click',event=>{
+            if(event.detail && ignorePointerClick)return;
+            const target=btn.group;
+            if(target)data.onSelectCase?.(target.representative.caseId,target.representative,target.points);
+          });
+          observationLayer.append(btn);markerButtons.push(btn);
+        }
+        btn.group=group;
+        btn.dataset.cluster=String(count>1);
+        btn.dataset.focused=String(Boolean(group.focused));
+        btn.dataset.role=point.role||'event';
+        btn.style.left=group.x+'px';btn.style.top=group.y+'px';
+        const name=count>1?'Explore '+count+' recorded positions':
+          'Open '+(point.label||'recorded position');
+        const label=name+' near '+coord(point.lat,true)+', '+coord(point.lon);
+        btn.setAttribute('aria-label',label);btn.title=label;
+        btn.textContent=count>1 ? String(count) : '';
+      }
+      while(markerButtons.length>groups.length)markerButtons.pop().remove();
+    }
     function drawLabels(ctx,cam) {
       const occupied=[], padding=6;
       const inside=(p)=>p.z>0&&p.x>=3&&p.x<=width-3&&p.y>=3&&p.y<=height-3;
@@ -296,13 +378,14 @@
       const areaCenter=validBounds(data.map)
         ? {lon:(data.map.bounds[0]+data.map.bounds[2])/2,lat:(data.map.bounds[1]+data.map.bounds[3])/2}
         : areaAnchor(data.area);
-      const markers=data.points.map(point=>({p:cam.project(point.lon,point.lat),point})).filter(({p})=>inside(p));
+      const markers=data.markerPoints?.length ? [] :
+        data.points.map(point=>({p:cam.project(point.lon,point.lat),point})).filter(({p})=>inside(p));
       const observation=areaCenter ? null : markers.find(({p})=>p.z>.25);
       const target=areaCenter ? cam.project(areaCenter.lon,areaCenter.lat) : observation?.p;
       const showCallout=Boolean(view.mode==='globe'&&target&&target.z>.25&&inside(target)&&(observation||data.area?.name));
       regionCallout.hidden=!showCallout;
       if(showCallout){
-        calloutType.textContent=observation?'Vessel observation':'Protected area';
+        calloutType.textContent=observation?'Recorded observation':'Protected area';
         calloutName.textContent=observation ? observation.point.label||'Recorded position' : data.area.name;
         const action=observation?'Focus on recorded positions':'Inspect the selected protected area';
         regionCallout.title=action;regionCallout.setAttribute('aria-label',action);
@@ -375,34 +458,57 @@
     }
     function update(next) {
       const points=(next.points||[]).filter(validLocation);
+      const contextPoints=(next.contextPoints||[]).filter(validLocation);
+      const contextChanged=next.contextPoints!==data.contextPointsInput;
       const key=JSON.stringify([next.area?.id,next.area?.center,next.caseId,next.map?.bounds,points]);
-      data={...next,points};
-      sr.textContent=(next.area?.name||'World')+'. '+(points.length?points.map(p=>(p.label||'Observed position')+' '+coord(p.lat,true)+', '+coord(p.lon)).join('. '):'No observed vessel positions.')+
+      let markerPoints=typeof next.onSelectCase==='function' ? contextPoints.filter(p=>p.caseId!=null) : [];
+      if(validLocation(next.focusPoint)){
+        const index=markerPoints.findIndex(p=>samePosition(p,next.focusPoint));
+        if(index>0)markerPoints.unshift(...markerPoints.splice(index,1));
+      }
+      data={...next,points,contextPoints,markerPoints,contextPointsInput:next.contextPoints};
+      const scope=Array.isArray(next.contextPoints)?contextPoints.length+' recorded positions in this selection. ':'';
+      const fitLabel=contextPoints.length?'Fit map to filtered observations':'Fit map to the selected area';
+      areaBtn.setAttribute('aria-label',fitLabel);areaBtn.title=fitLabel;
+      sr.textContent=(next.area?.name||'World')+'. '+scope+(points.length?points.map(p=>(p.label||'Observed position')+' '+coord(p.lat,true)+', '+coord(p.lon)).join('. '):'No selected positions.')+
         (validBounds(data.map)?' Verified perimeter displayed.':' Verified perimeter unavailable.');
-      if(!signature){signature=key;reset(next.focusArea?'area':'globe');}
-      else if(next.focusArea){signature=key;reset('area');}
-      else if(key!==signature){signature=key;reset(view.mode);}
+      if(next.overview){signature=key;reset('globe');}
+      else if(!signature){signature=key;reset(next.focusArea?'area':'globe',Boolean(next.focusArea));}
+      else if(next.focusArea){signature=key;reset('area',true);}
+      else if(key!==signature||contextChanged){signature=key;reset(view.mode);}
       else dirty();
     }
     function resize() {
       const priorWidth=width, priorHeight=height;
       width=root.clientWidth;height=root.clientHeight;
-      if((priorWidth<2||priorHeight<2)&&width>1&&height>1)reset(view.mode);
+      if((priorWidth<2||priorHeight<2)&&width>1&&height>1)reset(view.mode,focusedCase);
       else dirty();
     }
     stage.addEventListener('pointerdown',e=>{
       if(e.button!==0||drag)return;
-      stage.focus({preventScroll:true});stage.setPointerCapture(e.pointerId);drag={id:e.pointerId,x:e.clientX,y:e.clientY};stage.classList.add('mar-dragging');
+      ignorePointerClick=false;
+      if(!e.target.closest('.mar-marker'))stage.focus({preventScroll:true});
+      drag={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};
+      stage.classList.add('mar-dragging');
     });
     stage.addEventListener('pointermove',e=>{
       if(!drag||drag.id!==e.pointerId)return;
+      if(!drag.moved){
+        if(Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)<4)return;
+        drag.moved=true;ignorePointerClick=true;stage.setPointerCapture(e.pointerId);
+      }
       const cam=camera(view,width,height),unit=1/(cam.radius*DEG);
       view.lon=wrap(view.lon-(e.clientX-drag.x)*unit/Math.max(.22,Math.cos(view.lat*DEG)));
       view.lat=clamp(view.lat+(e.clientY-drag.y)*unit,-86,86);
       drag.x=e.clientX;drag.y=e.clientY;dirty();
     });
-    function release(e){if(drag?.id!==e.pointerId)return;drag=null;stage.classList.remove('mar-dragging');dirty();}
-    stage.addEventListener('pointerup',release);stage.addEventListener('lostpointercapture',release);
+    function release(e){
+      if(drag?.id!==e.pointerId)return;
+      if(e.type==='lostpointercapture' && e.target!==stage)return;
+      drag=null;stage.classList.remove('mar-dragging');
+      dirty();
+    }
+    stage.addEventListener('pointerup',release);stage.addEventListener('pointercancel',release);stage.addEventListener('lostpointercapture',release);
     stage.addEventListener('keydown',e=>{
       const movement=view.mode==='globe'?10/view.mag:view.span/12;
       if(e.key==='ArrowLeft')view.lon=wrap(view.lon-movement);
@@ -419,11 +525,12 @@
     new ResizeObserver(resize).observe(root);resize();
     texture('earth').then(t=>{world=t;if(!t)textureState.textContent='Relief layer unavailable';dirty();});
     texture('pacific').then(t=>{pacific=t;dirty();});
-    return {update,focusArea:()=>reset('area')};
+    return {update,focusArea:()=>reset('area',true),showGlobe:()=>reset('globe')};
   }
   window.SoundingsMap={render(container,data){
     let map=instances.get(container);
     if(!map||!container.querySelector('.mar-view')) {map=create(container);instances.set(container,map);}
     map.update(data);
-  },focusArea(container){instances.get(container)?.focusArea();}};
+  },focusArea(container){instances.get(container)?.focusArea();},
+    showGlobe(container){instances.get(container)?.showGlobe();}};
 })();
