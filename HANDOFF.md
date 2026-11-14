@@ -107,6 +107,18 @@ commits via the Git dialog. Real runs also write `data/mpa_index.json` (all ~17,
 - Real Databricks: earlier pipeline ran (sample data, MPA search found Galápagos ids 191, 10708, 11753). **Poseidon has not yet completed a real run** as far as this session knows.
 - Not yet verified for real: model-driven tool choice in the user's workspace, Linkup from Databricks, outline fetching (`geo.fetch_boundary`), MERGE writes, snapshot copy into the Git folder.
 
+## 9b. Update 22:30 — first real run results
+
+A real run worked (`databricks-llama-4-maverick`, 61 model decisions vs 15 policy, Linkup on, briefs written by
+the model). Areas: Galápagos 11753 and Hermandad 555745151. Finding: 41 of 93 cases were not fishing vessels:
+**gear buoys** (AIS beacons like `D-RUFFO001-99%`, type `gear`, drifting ~0.3 kn with 2,000 h "gaps") topped the
+ranking, plus tourist and seismic vessels. Fixed: `exclude_vessel_types` widget drops them before triage.
+That run's file, cleaned with `scripts/clean_snapshot.py`, is committed as `data/poseidon_snapshot.json`
+(52 cases, no outlines yet). Note: Ecuadorian artisanal boats may fish legally in parts of the Galápagos
+reserve; treat ECU artisanal cases with care in the demo.
+
+New `regions = flagship` widget loads 9 regions in one run.
+
 ## 10. Next steps, in order
 
 1. Get one real run working from a Git folder under `/Users/...`: `data_source = gfw`, `mode = history`, `2026-05-01` → `2026-11-14`, `mpa_search = Galápagos - Reserva Marina`, `max_cases = 2`, `max_steps = 6`. Fix whatever breaks (expect small GFW/Linkup/model response-shape issues).

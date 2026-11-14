@@ -20,8 +20,34 @@ def fold(text):
     return "".join(c for c in unicodedata.normalize("NFKD", str(text or "")) if not unicodedata.combining(c)).lower()
 
 
+# Global regions loaded for the globe view. Each entry: alternative search terms (any may match).
+FLAGSHIP_REGIONS = [
+    "Galápagos - Reserva Marina",
+    "Hermandad - Reserva Marina",
+    "Revillagigedo",
+    "Isla del Coco|Cocos Island",
+    "Cordillera de Coiba|Coiba",
+    "Papahānaumokuākea",
+    "Phoenix Islands",
+    "Chagos|British Indian Ocean Territory",
+    "Ascension Island|Ascension",
+]
+# Designations that duplicate a marine reserve's footprint; prefer the reserve itself.
+_SECONDARY = ("world heritage", "unesco", "ramsar", "biosphere", "important bird", "key biodiversity", "ebsa")
+
+# GFW vessel types that are not fishing vessels. Gear = AIS beacons on nets and drifting FADs: they drift
+# for weeks without transmitting and would otherwise dominate the risk ranking.
+DEFAULT_EXCLUDED_TYPES = ("gear", "passenger", "seismic_vessel", "other_non_fishing", "cargo", "tanker")
+
+
+def _rank(row):
+    """Overlapping designations (World Heritage, biosphere...) sort after the reserve; otherwise keep GFW order."""
+    return any(t in fold(row["mpa_name"]) for t in _SECONDARY)
+
+
 def select_mpas(all_mpas, search="", ids="", per_term=2):
-    """Explicit ids win; otherwise every protected area whose name contains the search text."""
+    """Explicit ids win; otherwise every protected area whose name contains the search text.
+    Terms are separated by commas; a term may list alternatives separated by '|'."""
     wanted = [x.strip() for x in str(ids or "").split(",") if x.strip()]
     rows = [{"mpa_id": str(m.get("id")), "mpa_name": m.get("label") or m.get("name") or str(m.get("id"))} for m in all_mpas]
     if wanted:
@@ -35,9 +61,27 @@ def select_mpas(all_mpas, search="", ids="", per_term=2):
         raise ValueError("Give mpa_ids or mpa_search")
     out = []
     for needle in needles:   # several names may be given, separated by commas
-        matches = [r for r in rows if needle in fold(r["mpa_name"]) and r not in out]
+        alternatives = [a.strip() for a in needle.split("|") if a.strip()]
+        matches = []
+        for alt in alternatives:   # first alternative that matches anything wins
+            matches = sorted((r for r in rows if alt in fold(r["mpa_name"]) and r not in out), key=_rank)
+            if matches:
+                break
         out += matches if len(needles) == 1 else matches[:per_term]
     return out
+
+
+def exclude_non_fishing(events, excluded=DEFAULT_EXCLUDED_TYPES):
+    """Drop events from vessel types that are not fishing vessels. Returns (kept, counts by type)."""
+    excluded = {t.strip().lower() for t in excluded if t and t.strip()}
+    kept, dropped = [], {}
+    for e in events:
+        t = str(e.get("vessel_type") or "").lower()
+        if t in excluded:
+            dropped[t] = dropped.get(t, 0) + 1
+        else:
+            kept.append(e)
+    return kept, dropped
 
 
 def collect_events(ctx, mpas):
@@ -185,7 +229,7 @@ def _case_row(ctx, case, a, brief, written_by, change, mem, fp, run_id):
 
 
 def run(ctx, mpas, memory=None, max_cases=5, force=False, focus=(), run_id=None, events=None,
-        llm_endpoint=None, log=print, per_area=False):
+        llm_endpoint=None, log=print, per_area=False, exclude_types=DEFAULT_EXCLUDED_TYPES):
     """Execute one run. Returns {"run", "events", "cases", "steps", "news", "mpa_context"} as lists of row dicts."""
     run_id = run_id or uuid.uuid4().hex[:12]
     started, memory = now_iso(), memory or {}
@@ -193,6 +237,11 @@ def run(ctx, mpas, memory=None, max_cases=5, force=False, focus=(), run_id=None,
     if events is None:
         events, notes = collect_events(ctx, mpas)
     log(f"[fetch] {len(events)} events in {len(mpas)} protected area(s), window {ctx.window_start} to {ctx.window_end}")
+    events, dropped = exclude_non_fishing(events, exclude_types or ())
+    if dropped:
+        msg = ", ".join(f"{n} {t}" for t, n in sorted(dropped.items()))
+        notes.append(f"Ignored {sum(dropped.values())} events from non-fishing vessel types ({msg}).")
+        log(f"[filter] ignored non-fishing vessel types: {msg}")
 
     cases = build_cases(events)
     case_of = {(e["mpa_id"], e["vessel_id"]): f"{e['mpa_id']}:{e['vessel_id']}" for e in events if e.get("vessel_id")}

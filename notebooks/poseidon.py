@@ -98,7 +98,9 @@ dbutils.widgets.dropdown("mode", "history", ["history", "live"])
 dbutils.widgets.text("start_date", "2026-08-01")
 dbutils.widgets.text("end_date", "2026-11-14")
 dbutils.widgets.text("lookback_days", "30")
+dbutils.widgets.dropdown("regions", "custom", ["custom", "flagship"])
 dbutils.widgets.text("mpa_search", "Galapagos")
+dbutils.widgets.text("exclude_vessel_types", "gear,passenger,seismic_vessel,other_non_fishing,cargo,tanker")
 dbutils.widgets.text("mpa_ids", "")
 dbutils.widgets.text("max_cases", "5")
 dbutils.widgets.text("max_steps", "8")
@@ -115,7 +117,7 @@ dbutils.widgets.dropdown("snapshot_scope", "all_areas", ["all_areas", "this_run_
 dbutils.widgets.dropdown("global_news", "true", ["true", "false"])
 
 W = {k: dbutils.widgets.get(k).strip() for k in
-     ["mode", "start_date", "end_date", "lookback_days", "mpa_search", "mpa_ids", "max_cases", "max_steps", "focus",
+     ["regions", "exclude_vessel_types", "mode", "start_date", "end_date", "lookback_days", "mpa_search", "mpa_ids", "max_cases", "max_steps", "focus",
       "force_reinvestigate", "data_source", "search_provider", "llm_endpoint", "catalog", "schema", "reset_tables",
       "snapshot_to_repo", "snapshot_scope", "global_news"]}
 CATALOG, SCHEMA = W["catalog"], W["schema"]
@@ -226,7 +228,11 @@ if SAMPLE:
     mpas = pipeline.select_mpas(sample.SAMPLE_MPAS, search="sample")
 else:
     window_start, window_end = resolve_window(W["mode"], W["start_date"], W["end_date"], W["lookback_days"])
-    mpas = pipeline.select_mpas(gfw.mpas(), search=W["mpa_search"], ids=W["mpa_ids"])
+    if W["regions"] == "flagship" and not W["mpa_ids"]:
+        mpas = pipeline.select_mpas(gfw.mpas(), search=", ".join(pipeline.FLAGSHIP_REGIONS), per_term=1)
+        print(f"Flagship regions: {len(mpas)} of {len(pipeline.FLAGSHIP_REGIONS)} matched")
+    else:
+        mpas = pipeline.select_mpas(gfw.mpas(), search=W["mpa_search"], ids=W["mpa_ids"])
 print(f"Mode: {W['mode']}   Window: {window_start} to {window_end}")
 print("Protected areas:")
 for m in mpas:
@@ -271,6 +277,7 @@ print(f"Memory: {len(memory)} case(s) remembered from earlier runs\n")
 ctx = Context(gfw=gfw, search=search, llm=llm, window_start=window_start, window_end=window_end,
               mode=W["mode"], max_steps=int(W["max_steps"]))
 result = pipeline.run(ctx, mpas, memory=memory, max_cases=int(W["max_cases"]), per_area=True,
+                      exclude_types=[t for t in W["exclude_vessel_types"].split(",") if t.strip()],
                       force=W["force_reinvestigate"] == "true",
                       focus=[f for f in W["focus"].split(",") if f.strip()], llm_endpoint=LLM_ENDPOINT)
 run_row = result["run"][0]

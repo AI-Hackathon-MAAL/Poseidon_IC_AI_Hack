@@ -342,5 +342,29 @@ class GlobeLayer(unittest.TestCase):
         self.assertEqual([m["mpa_id"] for m in got], ["1", "2", "4"])    # at most 2 per term
 
 
+class RealDataFixes(unittest.TestCase):
+    def test_gear_buoys_and_tour_boats_are_not_cases(self):
+        buoy = {"id": "sample-buoy", "name": "D-RUFFO001-99%", "ssvid": "772851001", "flag": None, "type": "GEAR"}
+        tour = {"id": "sample-tour", "name": "TOUR BOAT", "ssvid": "735000001", "flag": "ECU", "type": "PASSENGER"}
+        gfw = SampleGFW({("sample-1", "gap"): [_event("b1", "2026-10-01T00:00:00Z", "2026-10-30T00:00:00Z", buoy),
+                                                _event("t1", "2026-10-03T00:00:00Z", "2026-10-04T00:00:00Z", tour)]})
+        out = run(make_ctx(gfw=gfw))
+        self.assertNotIn("sample-buoy", {c["vessel_id"] for c in out["cases"]})
+        self.assertNotIn("sample-tour", {c["vessel_id"] for c in out["cases"]})
+        self.assertNotIn("b1", {e["event_id"] for e in out["events"]})
+        self.assertTrue(any("non-fishing vessel types" in n for n in out["run"][0]["notes"]))
+        everything = pipeline.run(make_ctx(gfw=gfw), MPAS, log=lambda *_: None, exclude_types=())
+        self.assertIn("sample-buoy", {c["vessel_id"] for c in everything["cases"]})
+
+    def test_flagship_selection_prefers_the_reserve_over_overlapping_designations(self):
+        mpas = [{"id": 191, "label": "Îles Galápagos - World Heritage Site (natural or mixed)"},
+                {"id": 10708, "label": "Archipiélago de Colón (Galápagos) - UNESCO-MAB Biosphere Reserve"},
+                {"id": 11753, "label": "Galápagos - Reserva Marina"},
+                {"id": 7, "label": "Revillagigedo - World Heritage Site"}, {"id": 8, "label": "Revillagigedo - Parque Nacional"},
+                {"id": 9, "label": "Cocos Island National Park"}]
+        got = pipeline.select_mpas(mpas, search="galapagos, revillagigedo, isla del coco|cocos island", per_term=1)
+        self.assertEqual([m["mpa_id"] for m in got], ["11753", "8", "9"])
+
+
 if __name__ == "__main__":
     unittest.main()

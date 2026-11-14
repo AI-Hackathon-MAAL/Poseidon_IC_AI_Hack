@@ -1,10 +1,10 @@
 {
  "product": "Poseidon",
- "generated_at": "2026-11-14T21:49:10+00:00",
+ "generated_at": "2026-11-14T22:15:16+00:00",
  "attribution": "Vessel activity data (c) Global Fishing Watch (apparent activity; non-commercial use). Protected-area outlines: UNEP-WCMC and IUCN, Protected Planet (WDPA). Web context via Linkup.",
  "disclaimer": "Every case is a lead for review, not proof of illegal fishing.",
  "latest_run": {
-  "run_id": "e69711f124cb",
+  "run_id": "d5d6757e52ac",
   "mode": "history",
   "window_start": "2026-10-01",
   "window_end": "2026-10-31",
@@ -16,8 +16,8 @@
    "Sample Marine Reserve (synthetic)",
    "Sample Seamount Sanctuary (synthetic)"
   ],
-  "started_at": "2026-11-14T21:49:10+00:00",
-  "finished_at": "2026-11-14T21:49:10+00:00",
+  "started_at": "2026-11-14T22:15:16+00:00",
+  "finished_at": "2026-11-14T22:15:16+00:00",
   "n_events": 5,
   "n_cases": 4,
   "n_investigated": 3,
@@ -69,11 +69,11 @@
  },
  "runs": [
   {
-   "run_id": "e69711f124cb",
+   "run_id": "d5d6757e52ac",
    "mode": "history",
    "window_start": "2026-10-01",
    "window_end": "2026-10-31",
-   "finished_at": "2026-11-14T21:49:10+00:00",
+   "finished_at": "2026-11-14T22:15:16+00:00",
    "n_events": 5,
    "n_cases": 4,
    "n_investigated": 3
@@ -98,7 +98,7 @@
    "n_encounter": 0,
    "n_loitering": 0,
    "latest_event_at": "2026-10-20T09:15:00Z",
-   "last_investigated_at": "2026-11-14T21:49:10+00:00",
+   "last_investigated_at": "2026-11-14T22:15:16+00:00",
    "news_summary": "Synthetic example: patrols reported a large squid fleet near the reserve boundary this month.",
    "rules_summary": "Synthetic example: industrial fishing is prohibited throughout the reserve.",
    "rules_sources": [
@@ -165,7 +165,7 @@
    "n_encounter": 1,
    "n_loitering": 0,
    "latest_event_at": "2026-10-21T05:00:00Z",
-   "last_investigated_at": "2026-11-14T21:49:10+00:00",
+   "last_investigated_at": "2026-11-14T22:15:16+00:00",
    "news_summary": "Synthetic example: patrols reported a large squid fleet near the reserve boundary this month.",
    "rules_summary": "Synthetic example: industrial fishing is prohibited throughout the reserve.",
    "rules_sources": [
@@ -448,8 +448,8 @@
    "mode": "history",
    "window_start": "2026-10-01",
    "window_end": "2026-10-31",
-   "run_id": "e69711f124cb",
-   "investigated_at": "2026-11-14T21:49:10+00:00",
+   "run_id": "d5d6757e52ac",
+   "investigated_at": "2026-11-14T22:15:16+00:00",
    "events": [
     {
      "event_id": "sg-1",
@@ -475,16 +475,16 @@
      "also_in_mpas": [],
      "case_id": "sample-1:sample-vessel-dark",
      "mode": "history",
-     "run_id": "e69711f124cb",
-     "fetched_at": "2026-11-14T21:49:10+00:00"
+     "run_id": "d5d6757e52ac",
+     "fetched_at": "2026-11-14T22:15:16+00:00"
     }
    ],
    "steps": [
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 1,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "resolve_identity",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -493,10 +493,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 2,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "activity_around_event",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -505,10 +505,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 3,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "web_search_vessel",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -517,10 +517,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 4,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "web_search_owner",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -529,10 +529,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 5,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "vessel_history",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -541,10 +541,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-dark",
      "step_no": 6,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "finish",
      "decided_by": "llm",
      "reason": "Identity, behaviour and public record are covered.",
@@ -712,8 +712,8 @@
    "mode": "history",
    "window_start": "2026-10-01",
    "window_end": "2026-10-31",
-   "run_id": "e69711f124cb",
-   "investigated_at": "2026-11-14T21:49:10+00:00",
+   "run_id": "d5d6757e52ac",
+   "investigated_at": "2026-11-14T22:15:16+00:00",
    "events": [
     {
      "event_id": "sg-3",
@@ -738,8 +738,8 @@
      "also_in_mpas": [],
      "case_id": "sample-2:sample-vessel-d",
      "mode": "history",
-     "run_id": "e69711f124cb",
-     "fetched_at": "2026-11-14T21:49:10+00:00"
+     "run_id": "d5d6757e52ac",
+     "fetched_at": "2026-11-14T22:15:16+00:00"
     },
     {
      "event_id": "se-1",
@@ -767,16 +767,16 @@
      "also_in_mpas": [],
      "case_id": "sample-2:sample-vessel-d",
      "mode": "history",
-     "run_id": "e69711f124cb",
-     "fetched_at": "2026-11-14T21:49:10+00:00"
+     "run_id": "d5d6757e52ac",
+     "fetched_at": "2026-11-14T22:15:16+00:00"
     }
    ],
    "steps": [
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 1,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "resolve_identity",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -785,10 +785,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 2,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "activity_around_event",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -797,10 +797,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 3,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "web_search_vessel",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -809,10 +809,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 4,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "vessel_history",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -821,10 +821,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 5,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "mpa_rules",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -833,10 +833,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-2:sample-vessel-d",
      "step_no": 6,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "finish",
      "decided_by": "llm",
      "reason": "Identity, behaviour and public record are covered.",
@@ -908,8 +908,8 @@
    "mode": "history",
    "window_start": "2026-10-01",
    "window_end": "2026-10-31",
-   "run_id": "e69711f124cb",
-   "investigated_at": "2026-11-14T21:49:10+00:00",
+   "run_id": "d5d6757e52ac",
+   "investigated_at": "2026-11-14T22:15:16+00:00",
    "events": [
     {
      "event_id": "sf-1",
@@ -938,8 +938,8 @@
      "also_in_mpas": [],
      "case_id": "sample-1:sample-vessel-c",
      "mode": "history",
-     "run_id": "e69711f124cb",
-     "fetched_at": "2026-11-14T21:49:10+00:00"
+     "run_id": "d5d6757e52ac",
+     "fetched_at": "2026-11-14T22:15:16+00:00"
     }
    ],
    "steps": []
@@ -1076,8 +1076,8 @@
    "mode": "history",
    "window_start": "2026-10-01",
    "window_end": "2026-10-31",
-   "run_id": "e69711f124cb",
-   "investigated_at": "2026-11-14T21:49:10+00:00",
+   "run_id": "d5d6757e52ac",
+   "investigated_at": "2026-11-14T22:15:16+00:00",
    "events": [
     {
      "event_id": "sg-2",
@@ -1103,16 +1103,16 @@
      "also_in_mpas": [],
      "case_id": "sample-1:sample-vessel-b",
      "mode": "history",
-     "run_id": "e69711f124cb",
-     "fetched_at": "2026-11-14T21:49:10+00:00"
+     "run_id": "d5d6757e52ac",
+     "fetched_at": "2026-11-14T22:15:16+00:00"
     }
    ],
    "steps": [
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 1,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "resolve_identity",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1121,10 +1121,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 2,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "activity_around_event",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1133,10 +1133,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 3,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "web_search_vessel",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1145,10 +1145,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 4,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "vessel_history",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1157,10 +1157,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 5,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "mpa_rules",
      "decided_by": "llm",
      "reason": "Biggest remaining unknown.",
@@ -1169,10 +1169,10 @@
      "duration_ms": 0
     },
     {
-     "run_id": "e69711f124cb",
+     "run_id": "d5d6757e52ac",
      "case_id": "sample-1:sample-vessel-b",
      "step_no": 6,
-     "at": "2026-11-14T21:49:10+00:00",
+     "at": "2026-11-14T22:15:16+00:00",
      "tool": "finish",
      "decided_by": "llm",
      "reason": "Identity, behaviour and public record are covered.",
@@ -1194,8 +1194,8 @@
    "query": "Latest news on illegal fishing, fishing fleets or vessel detentions in or near Sample Marine Reserve (synthetic).",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T21:49:10+00:00",
-   "run_id": "e69711f124cb"
+   "fetched_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "d5d6757e52ac"
   },
   {
    "news_id": "950ddfec32d95d8a",
@@ -1207,8 +1207,8 @@
    "query": "Latest news on illegal fishing, fishing fleets or vessel detentions in or near Sample Marine Reserve (synthetic).",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T21:49:10+00:00",
-   "run_id": "e69711f124cb"
+   "fetched_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "d5d6757e52ac"
   },
   {
    "news_id": "8db2064c6cc5949b",
@@ -1220,8 +1220,8 @@
    "query": "Latest news on illegal fishing, fishing fleets or vessel detentions in or near Sample Seamount Sanctuary (synthetic).",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T21:49:10+00:00",
-   "run_id": "e69711f124cb"
+   "fetched_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "d5d6757e52ac"
   },
   {
    "news_id": "566cfd51db216995",
@@ -1233,8 +1233,8 @@
    "query": "Latest news on illegal fishing, fishing fleets or vessel detentions in or near Sample Seamount Sanctuary (synthetic).",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T21:49:10+00:00",
-   "run_id": "e69711f124cb"
+   "fetched_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "d5d6757e52ac"
   }
  ],
  "global_news": [
@@ -1246,8 +1246,8 @@
    "query": "Latest news on illegal, unreported and unregulated fishing: vessels detained, seized or fined, anywhere in the world.",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T21:49:10+00:00",
-   "run_id": "e69711f124cb",
+   "fetched_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "d5d6757e52ac",
    "place_type": "country",
    "place_name": "Ecuador",
    "mpa_id": null,
@@ -1262,8 +1262,8 @@
    "query": "Latest news on illegal, unreported and unregulated fishing: vessels detained, seized or fined, anywhere in the world.",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T21:49:10+00:00",
-   "run_id": "e69711f124cb",
+   "fetched_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "d5d6757e52ac",
    "place_type": "mpa",
    "place_name": "Sample Seamount Sanctuary (synthetic)",
    "mpa_id": "sample-2",
@@ -1278,8 +1278,8 @@
    "query": "Latest news on illegal, unreported and unregulated fishing: vessels detained, seized or fined, anywhere in the world.",
    "from_date": "2026-10-01",
    "provider": "linkup",
-   "fetched_at": "2026-11-14T21:49:10+00:00",
-   "run_id": "e69711f124cb",
+   "fetched_at": "2026-11-14T22:15:16+00:00",
+   "run_id": "d5d6757e52ac",
    "place_type": "none",
    "place_name": null,
    "mpa_id": null,

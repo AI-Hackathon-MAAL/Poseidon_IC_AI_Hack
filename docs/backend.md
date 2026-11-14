@@ -159,6 +159,8 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 | --- | --- |
 | `mode` | `history` (uses `start_date`, `end_date`) or `live` (uses `lookback_days`, counted back from now) |
 | `mpa_ids` / `mpa_search` | Ids win (leave empty to use the search); otherwise every area whose name contains the search text (accents ignored). Several names can be given separated by commas (up to 2 matches each, 12 areas per run). `11753` = Galápagos Marine Reserve |
+| `regions` | `flagship` loads 9 global regions in one run (Galápagos, Hermandad, Revillagigedo, Cocos Island, Coiba, Papahānaumokuākea, Phoenix Islands, Chagos, Ascension); `custom` uses `mpa_search` / `mpa_ids` |
+| `exclude_vessel_types` | GFW vessel types ignored entirely. Default `gear,passenger,seismic_vessel,other_non_fishing,cargo,tanker`: gear = AIS beacons on nets and drifting FADs, which drift for weeks without transmitting and would otherwise top the ranking |
 | `max_cases` | How many cases the agent investigates **per protected area** per run (highest priority first; the rest are `queued`) |
 | `max_steps` | Step budget per case |
 | `focus` | Comma-separated vessel names, ids or MMSIs to investigate first |
