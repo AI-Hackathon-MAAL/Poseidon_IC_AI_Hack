@@ -356,6 +356,13 @@ class RealDataFixes(unittest.TestCase):
         everything = pipeline.run(make_ctx(gfw=gfw), MPAS, log=lambda *_: None, exclude_types=())
         self.assertIn("sample-buoy", {c["vessel_id"] for c in everything["cases"]})
 
+    def test_vessel_database_pages_are_not_web_risk_hits(self):
+        from poseidon.scoring import web_risk_hits
+        sources = [{"url": "https://maritimeoptima.com/public/vessels/pages/imo:9679634/F_V_BELLE_ISLE.html",
+                    "title": "F/V BELLE ISLE", "snippet": "BELLE ISLE fishing vessel. Check IUU vessel lists."},
+                   {"url": "https://news.example.org/a", "title": "BELLE ISLE detained", "snippet": "The BELLE ISLE was detained."}]
+        self.assertEqual(web_risk_hits(sources, ["BELLE ISLE"]), ["https://news.example.org/a"])
+
     def test_flagship_selection_prefers_the_reserve_over_overlapping_designations(self):
         mpas = [{"id": 191, "label": "Îles Galápagos - World Heritage Site (natural or mixed)"},
                 {"id": 10708, "label": "Archipiélago de Colón (Galápagos) - UNESCO-MAB Biosphere Reserve"},

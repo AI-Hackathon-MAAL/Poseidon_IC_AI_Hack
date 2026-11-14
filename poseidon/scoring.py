@@ -34,11 +34,23 @@ def tracking_status(events, gap_hours=12):
     return "no_qualifying_gap_found"
 
 
+# Vessel-tracking and registry sites list every ship and often carry generic "IUU" text in their
+# page furniture. They identify a vessel; they are not reports about it.
+VESSEL_DATABASE_DOMAINS = ("maritimeoptima.", "marinetraffic.", "vesselfinder.", "myshiptracking.", "fleetmon.",
+                           "magicport.", "balticshipping.", "shipspotting.", "vesseltracker.", "marinevesseltraffic.",
+                           "shipfinder.", "globalfishingwatch.org/map", "equasis.", "seasearcher.", "ship-db.",
+                           "fishingvessels.", "maritime-database.", "shiplocation.", "vesseltracking.")
+
+
 def web_risk_hits(sources, identifiers):
-    """Sources that mention BOTH this vessel/owner and a risk term (avoids generic IUU articles)."""
+    """Sources that mention BOTH this vessel/owner and a risk term, excluding vessel databases.
+    A hit means a page worth reading, not a finding; the brief must still say what the source states."""
     ids = [str(i).lower() for i in identifiers if i and len(str(i)) >= 4]
     hits = []
     for s in sources or []:
+        url = (s.get("url") or "").lower()
+        if any(d in url for d in VESSEL_DATABASE_DOMAINS):
+            continue
         text = f"{s.get('title', '')} {s.get('snippet', '')}".lower()
         if any(i in text for i in ids) and any(t in text for t in RISK_TERMS):
             hits.append(s.get("url"))
