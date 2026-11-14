@@ -1,55 +1,99 @@
 # Dark Fishing Watch — Imperial AI Hackathon
 
-An autonomous agent that spots vessels **switching off tracking to fish inside marine protected areas (MPAs)**, investigates them, and writes a cited one-page brief for investigators.
+A Databricks and Python pipeline for investigating suspected illegal fishing inside Marine Protected Areas (MPAs).
+
+## Problem
+
+Fishing vessels sometimes disable their AIS transponders ("going dark") before or during activity inside Marine Protected Areas. Reviewing tracking gaps, cross-referencing vessel identity history, and searching public records for prior sanctions or detentions requires manual effort across multiple tools.
+
+## What we built
+
+An automated investigation pipeline that ingests MPA vessel events, groups them into per-vessel leads, scores risk using explicit rules, enriches each lead with vessel history and web search results, and writes a cited one-page Markdown brief for investigators.
 
 Every output is a **lead, not an accusation**: Global Fishing Watch labels its detections "apparent".
 
-## How it fits together
+## How it works
 
 ```
 Global Fishing Watch API ──> Databricks notebooks ──> candidates table
                                                          │
                                                          ▼
-Front end  <── briefs table  <── agent loop (vessel history, web check, score, brief)
+Front end  <── briefs table  <── agent loop (history, web search, score, brief)
 ```
+
+For each `(vessel, MPA)` lead, `agent/dark_fishing_agent.py` runs five steps and records an audit trace:
+
+1. **Gather** — collects candidate events (`gap`, `fishing`, `encounter`, `loitering`) for the vessel in the selected MPA.
+2. **History** — queries Global Fishing Watch for vessel name/flag history and recent event counts.
+3. **Web search** — queries Linkup or Tavily for news, sanctions, or IUU fishing reports mentioning the vessel.
+4. **Score** — computes a 0–100 rule-based risk score (`low` / `medium` / `high`) with plain-language reasons (e.g., gap duration >= 24h, fishing within 48h of a gap ending, flag changes, web hits).
+5. **Brief** — prompts an LLM (or falls back to a deterministic template) to write a cited Markdown brief strictly from the gathered facts.
+
+A separate scheduled notebook (`notebooks/03_live_mpa_monitor.py`) supports rolling-window monitoring (defaulting to Galápagos) and stores historical runs in `monitor_reports` with a `latest_mpa_briefs` SQL view.
+
+## APIs, models, and datasets
+
+### APIs
+- **Global Fishing Watch API v3** (`https://gateway.api.globalfishingwatch.org/v3`) — MPA catalog, vessel events, and vessel identity lookup.
+- **Linkup Search API** (`https://api.linkup.so/v1/search`) — live web search with sourced answers (default).
+- **Tavily Search API** (`https://api.tavily.com/search`) — alternative live web search provider.
+- **Databricks SDK** (`databricks-sdk`) — queries Databricks Model Serving endpoints.
+
+### Models
+- **`databricks-meta-llama-3-3-70b-instruct`** — served via Databricks Foundation Model APIs (configurable via the `llm_endpoint` widget; falls back to a deterministic template if unavailable).
+
+### Datasets
+- **Global Fishing Watch** (non-commercial use; attribution required):
+  - `public-mpa-all` — Marine Protected Area boundaries and metadata
+  - `public-global-gaps-events:latest` — AIS tracking-off (gap) events
+  - `public-global-fishing-events:latest` — apparent fishing events
+  - `public-global-encounters-events:latest` — vessel-to-vessel encounter events
+  - `public-global-loitering-events:latest` — loitering events
+  - `public-global-vessel-identity:latest` — vessel identity and flag history
+- **Synthetic sample data** (`data/sample_candidates.json`, `data/sample_briefs.json`) — local fixtures for development and testing without API keys.
 
 ## Repo layout
 
 | Path | What it is |
 | --- | --- |
 | `notebooks/` | Databricks notebooks (source format — import via Workspace > Import, or Git folder) |
-| `agent/` | Agent loop, tools and prompts |
+| `agent/` | Agent loop, tools, prompts, and live monitor client |
 | `app/` | Front end (built from the Figma frames) |
-| `data/` | Small **synthetic** sample data so everyone can build before the real data lands |
+| `data/` | Small **synthetic** sample data for testing without API keys |
 | `docs/schema.md` | Table schemas the agent and front end agree on |
+| `docs/live-monitor.md` | Setup and scheduling notes for `03_live_mpa_monitor.py` |
+| `tests/` | Unit tests for the live monitor |
 
 ## Setup
 
 1. **Secrets** — never commit keys. Store them as Databricks secrets in the scope `hackathon`:
    - `gfw_token` — Global Fishing Watch API token
    - `linkup_key` or `tavily_key` — web search key
+
 2. **Outbound internet** — Databricks Free Edition blocks most outbound domains by default. Verify the workspace with LinkedIn to unlock it, then test:
    ```python
    import requests
    print(requests.get("https://gateway.api.globalfishingwatch.org/v3/datasets", timeout=10).status_code)
    ```
    Any status code = reachable. A connection/DNS error = still blocked.
+
 3. **Run the notebooks in order:**
    - `00_load_sample_data` — writes synthetic data into the tables (no keys needed)
    - `01_ingest_gfw` — pulls real MPA list + events from Global Fishing Watch
    - `02_run_agent` — investigates leads and writes the `briefs` table (set `source` to `gfw` for real data)
+   - `03_live_mpa_monitor` — optional hourly rolling-window Galápagos brief (see [docs/live-monitor.md](docs/live-monitor.md))
 
 Front end: build against `data/sample_briefs.json` (same shape as the `briefs` table) until the real table is ready.
 
 Tables live in `workspace.dark_fishing` by default (change the `catalog` / `schema` widgets if needed).
 
+## Local tests
+
+```bash
+pip install -r requirements.txt
+python -m unittest discover -s tests -v
+```
+
 ## Data attribution
 
 Uses data from [Global Fishing Watch](https://globalfishingwatch.org) under their API terms (non-commercial use; attribution required).
-
-## Latest available Galápagos brief
-
-Run `notebooks/03_live_mpa_monitor.py` in Databricks for a rolling-window GFW
-brief, explicit tracking-gap assessments, and retained report history.
-See [live monitoring setup](docs/live-monitor.md) for credentials, MPA selection,
-hourly scheduling, and data-freshness limits.
