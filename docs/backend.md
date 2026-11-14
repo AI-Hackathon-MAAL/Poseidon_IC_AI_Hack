@@ -31,8 +31,18 @@ serve it through a Databricks App; ask and the snapshot can be exposed as `/api/
   "runs":  [ /* the last 20 runs, short form */ ],
   "mpas":  [ /* one per protected area: `mpa_status` fields + news_summary, rules_summary, rules_sources */ ],
   "cases": [ /* one per vessel per area, highest risk first: `cases` fields + "events": [...] + "steps": [...] */ ],
-  "news":  [ /* cited news items, newest first */ ]
+  "news":  [ /* cited news items per area, newest first */ ],
+  "global_news": [ /* worldwide news items with place_type, place_name, lat, lon for the globe */ ]
 }
+```
+
+Each entry of `mpas[]` also carries the outline for the map:
+
+```jsonc
+{ "mpa_id": "11753", "mpa_name": "...", /* status counts */,
+  "boundary": { "type": "MultiPolygon", "coordinates": [...] },   // simplified GeoJSON, [lon, lat]; null if not found
+  "bbox": [west, south, east, north], "center_lat": -0.5, "center_lon": -90.5,
+  "boundary_source": "WDPA (UNEP-WCMC and IUCN, Protected Planet)" }
 ```
 
 Inside the snapshot, JSON columns (`reasons`, `sources`, `evidence`, ...) are already parsed objects.
@@ -119,6 +129,22 @@ Tools: `resolve_identity`, `activity_around_event`, `vessel_history`, `encounter
 
 `mpa_id`, `mpa_name`, `news_summary`, `news_sources`, `rules_summary`, `rules_sources`, `updated_at`, `run_id`.
 
+### `mpa_boundaries` — outline per area (key: `mpa_id`; fetched once, then reused)
+
+`mpa_id`, `mpa_name`, `geometry` (JSON: simplified GeoJSON MultiPolygon, outer rings only, for drawing not
+measuring), `bbox` (JSON `[west, south, east, north]`), `center_lat`, `center_lon`, `source`, `error`, `fetched_at`.
+
+### `global_news` — worldwide intel for the globe (key: `news_id`)
+
+`news_id`, `title`, `url`, `snippet`, `query`, `place_type` (`mpa`, `country` or `none`), `place_name`,
+`mpa_id`, `lat`, `lon` (null when `place_type` is `none`), `from_date`, `provider`, `fetched_at`, `run_id`.
+Placement is by name match in code: a watched area's centre, else an approximate country centre.
+
+### `data/mpa_index.json` — search index (file, not a table)
+
+A list of `{id, name}` for every protected area Global Fishing Watch knows (about 17,500). Use it for the
+search box. Areas with an entry in `mpas[]` have data; the rest show "not investigated yet".
+
 ### `mpa_status` — dashboard numbers per area (rebuilt every run)
 
 `mpa_id`, `mpa_name`, `n_cases`, `n_high`, `n_medium`, `n_low`, `n_incomplete`, `n_queued`,
@@ -132,8 +158,8 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 | Widget | Meaning |
 | --- | --- |
 | `mode` | `history` (uses `start_date`, `end_date`) or `live` (uses `lookback_days`, counted back from now) |
-| `mpa_ids` / `mpa_search` | Ids win (leave empty to use the search); otherwise every area whose name contains the search text (accents ignored). `11753` = Galápagos Marine Reserve |
-| `max_cases` | How many cases the agent investigates per run (highest priority first; the rest are `queued`) |
+| `mpa_ids` / `mpa_search` | Ids win (leave empty to use the search); otherwise every area whose name contains the search text (accents ignored). Several names can be given separated by commas (up to 2 matches each, 12 areas per run). `11753` = Galápagos Marine Reserve |
+| `max_cases` | How many cases the agent investigates **per protected area** per run (highest priority first; the rest are `queued`) |
 | `max_steps` | Step budget per case |
 | `focus` | Comma-separated vessel names, ids or MMSIs to investigate first |
 | `force_reinvestigate` | Investigate again even if nothing changed |
@@ -141,7 +167,8 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 | `search_provider` | `linkup`, `tavily` or `none` |
 | `llm_endpoint` | `auto` finds a working chat model in the workspace |
 | `reset_tables` | Drops every Poseidon table first. Set back to `false` afterwards |
-| `snapshot_scope` | `this_run_areas` (default): the snapshot only contains the areas of this run. `all_areas`: every area in the tables |
+| `snapshot_scope` | `all_areas` (default): the snapshot contains every area investigated so far, for the globe. `this_run_areas`: only this run's areas |
+| `global_news` | Also fetch worldwide news for the globe (3 Linkup searches per run) |
 | `snapshot_to_repo` | Also writes `data/poseidon_snapshot.json` into the Git folder, ready to commit and push |
 
 **Live monitoring:** create a Databricks Job with this notebook as its task, parameters `mode=live`,

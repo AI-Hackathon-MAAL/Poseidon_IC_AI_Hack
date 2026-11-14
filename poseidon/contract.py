@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import json
 
-ATTRIBUTION = "Vessel activity data (c) Global Fishing Watch (apparent activity; non-commercial use). Web context via Linkup."
+ATTRIBUTION = ("Vessel activity data (c) Global Fishing Watch (apparent activity; non-commercial use). Protected-area outlines: "
+               "UNEP-WCMC and IUCN, Protected Planet (WDPA). Web context via Linkup.")
 
 TABLES = {
     "events": {"key": ["event_id", "event_type"], "columns": [
@@ -49,6 +50,15 @@ TABLES = {
     "mpa_context": {"key": ["mpa_id"], "columns": [
         ("mpa_id", "string"), ("mpa_name", "string"), ("news_summary", "string"), ("news_sources", "json"),
         ("rules_summary", "string"), ("rules_sources", "json"), ("updated_at", "timestamp"), ("run_id", "string")]},
+    "mpa_boundaries": {"key": ["mpa_id"], "columns": [
+        ("mpa_id", "string"), ("mpa_name", "string"), ("geometry", "json"), ("bbox", "json"),
+        ("center_lat", "double"), ("center_lon", "double"), ("source", "string"), ("error", "string"),
+        ("fetched_at", "timestamp")]},
+    "global_news": {"key": ["news_id"], "columns": [
+        ("news_id", "string"), ("title", "string"), ("url", "string"), ("snippet", "string"), ("query", "string"),
+        ("place_type", "string"), ("place_name", "string"), ("mpa_id", "string"), ("lat", "double"),
+        ("lon", "double"), ("from_date", "string"), ("provider", "string"), ("fetched_at", "timestamp"),
+        ("run_id", "string")]},
     "mpa_status": {"key": ["mpa_id"], "columns": [
         ("mpa_id", "string"), ("mpa_name", "string"), ("n_cases", "int"), ("n_high", "int"), ("n_medium", "int"),
         ("n_low", "int"), ("n_incomplete", "int"), ("n_queued", "int"), ("n_flagged_for_review", "int"),
@@ -130,7 +140,7 @@ def mpa_status_rows(cases, events):
     return list(out.values())
 
 
-def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at):
+def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at, boundaries=(), global_news=()):
     """Everything the front end needs in one JSON document (see docs/backend.md)."""
     runs = sorted((parse_row("runs", r) for r in runs), key=lambda r: _s(r.get("finished_at")) or "", reverse=True)
     cases = [parse_row("cases", c) for c in cases]
@@ -147,11 +157,28 @@ def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at):
         c["events"] = events_by_case.get(c["case_id"], [])
         c["steps"] = steps_by_case.get((c["case_id"], c.get("run_id")), [])
         out_cases.append(c)
+    shapes = {str(b["mpa_id"]): parse_row("mpa_boundaries", b) for b in boundaries}
+    status = {s["mpa_id"]: s for s in mpa_status_rows(cases, events)}
+    for mpa_id, b in shapes.items():   # areas with an outline but no events yet still appear on the globe
+        if mpa_id not in status:
+            status[mpa_id] = {
+                **{k: 0 for k in ("n_cases", "n_high", "n_medium", "n_low", "n_incomplete", "n_queued",
+                                  "n_flagged_for_review", "n_unidentified", "top_risk_score", "n_events",
+                                  "n_gap", "n_fishing", "n_encounter", "n_loitering")},
+                "mpa_id": mpa_id, "mpa_name": b.get("mpa_name"), "latest_event_at": None, "last_investigated_at": None}
     mpas = []
-    for s in mpa_status_rows(cases, events):
-        ctx = context.get(s["mpa_id"], {})
+    for s in status.values():
+        ctx, b = context.get(s["mpa_id"], {}), shapes.get(s["mpa_id"], {})
+        lat, lon = b.get("center_lat"), b.get("center_lon")
+        if lat is None:   # no outline: centre on the area's cases
+            pts = [(float(c["lat"]), float(c["lon"])) for c in cases
+                   if str(c.get("mpa_id")) == s["mpa_id"] and c.get("lat") is not None and c.get("lon") is not None]
+            if pts:
+                lat, lon = round(sum(p[0] for p in pts) / len(pts), 4), round(sum(p[1] for p in pts) / len(pts), 4)
         mpas.append({**s, "news_summary": ctx.get("news_summary"), "rules_summary": ctx.get("rules_summary"),
-                     "rules_sources": ctx.get("rules_sources") or []})
+                     "rules_sources": ctx.get("rules_sources") or [],
+                     "boundary": b.get("geometry"), "bbox": b.get("bbox"), "boundary_source": b.get("source"),
+                     "center_lat": lat, "center_lon": lon})
     return {
         "product": "Poseidon", "generated_at": generated_at, "attribution": ATTRIBUTION,
         "disclaimer": "Every case is a lead for review, not proof of illegal fishing.",
@@ -161,4 +188,5 @@ def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at):
         "mpas": sorted(mpas, key=lambda m: -m["top_risk_score"]),
         "cases": out_cases,
         "news": sorted((dict(n) for n in news), key=lambda n: _s(n.get("fetched_at")) or "", reverse=True),
+        "global_news": sorted((dict(n) for n in global_news), key=lambda n: _s(n.get("fetched_at")) or "", reverse=True),
     }

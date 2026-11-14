@@ -20,7 +20,7 @@ def fold(text):
     return "".join(c for c in unicodedata.normalize("NFKD", str(text or "")) if not unicodedata.combining(c)).lower()
 
 
-def select_mpas(all_mpas, search="", ids=""):
+def select_mpas(all_mpas, search="", ids="", per_term=2):
     """Explicit ids win; otherwise every protected area whose name contains the search text."""
     wanted = [x.strip() for x in str(ids or "").split(",") if x.strip()]
     rows = [{"mpa_id": str(m.get("id")), "mpa_name": m.get("label") or m.get("name") or str(m.get("id"))} for m in all_mpas]
@@ -30,10 +30,14 @@ def select_mpas(all_mpas, search="", ids=""):
         if missing:
             raise ValueError(f"Unknown protected-area id(s): {', '.join(missing)}")
         return [by_id[w] for w in wanted]
-    needle = fold(search).strip()
-    if not needle:
+    needles = [fold(t).strip() for t in str(search or "").split(",") if t.strip()]
+    if not needles:
         raise ValueError("Give mpa_ids or mpa_search")
-    return [r for r in rows if needle in fold(r["mpa_name"])]
+    out = []
+    for needle in needles:   # several names may be given, separated by commas
+        matches = [r for r in rows if needle in fold(r["mpa_name"]) and r not in out]
+        out += matches if len(needles) == 1 else matches[:per_term]
+    return out
 
 
 def collect_events(ctx, mpas):
@@ -181,7 +185,7 @@ def _case_row(ctx, case, a, brief, written_by, change, mem, fp, run_id):
 
 
 def run(ctx, mpas, memory=None, max_cases=5, force=False, focus=(), run_id=None, events=None,
-        llm_endpoint=None, log=print):
+        llm_endpoint=None, log=print, per_area=False):
     """Execute one run. Returns {"run", "events", "cases", "steps", "news", "mpa_context"} as lists of row dicts."""
     run_id = run_id or uuid.uuid4().hex[:12]
     started, memory = now_iso(), memory or {}
@@ -212,7 +216,11 @@ def run(ctx, mpas, memory=None, max_cases=5, force=False, focus=(), run_id=None,
                                   "fetched_at": now_iso(), "run_id": run_id})
         log(f"[news] {len(news_rows)} cited news item(s)")
 
-    decisions = triage(cases, memory, max_cases, force, focus)
+    if per_area:   # the budget applies to each protected area separately
+        decisions = [d for mpa in mpas
+                     for d in triage([c for c in cases if c.mpa_id == mpa["mpa_id"]], memory, max_cases, force, focus)]
+    else:
+        decisions = triage(cases, memory, max_cases, force, focus)
     counts = {k: sum(d["decision"] == k for d in decisions) for k in ("investigate", "queued", "skip_unchanged")}
     log(f"[triage] {len(cases)} case(s): investigate {counts['investigate']}, queued {counts['queued']}, "
         f"unchanged (remembered) {counts['skip_unchanged']}")

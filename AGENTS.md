@@ -18,6 +18,8 @@ There are two halves:
 2. `docs/backend.md` — the data contract (snapshot shape, every field, allowed values).
 3. `data/poseidon_snapshot.sample.json` — a synthetic example of the exact JSON to load.
 
+`data/mpa_index.json` (may not exist yet) lists every protected area for the search box.
+
 The real data file is `data/poseidon_snapshot.json` (same shape; may not exist yet). Load it if present,
 otherwise the sample. The front end makes no API calls and needs no keys.
 

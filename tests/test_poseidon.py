@@ -275,5 +275,72 @@ class Contract(unittest.TestCase):
         self.assertEqual(snap["mpas"][0]["top_risk_score"], case(out, "sample-vessel-dark")["risk_score"])
 
 
+class GlobeLayer(unittest.TestCase):
+    def test_outline_is_simplified_and_centred(self):
+        import math
+        from poseidon import geo
+        circle = [[math.cos(i / 500 * 2 * math.pi) * 2 - 90, math.sin(i / 500 * 2 * math.pi) * 2] for i in range(5000)]
+        circle.append(circle[0])
+        feature = {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [circle]}}]}
+        g = geo.simplify_geometry(feature, max_points=200)
+        n = sum(len(r) for poly in g["coordinates"] for r in poly)
+        self.assertTrue(8 <= n <= 200, n)
+        bbox, lat, lon = geo.bbox_and_center(g)
+        self.assertAlmostEqual(lat, 0, delta=0.1)
+        self.assertAlmostEqual(lon, -90, delta=0.1)
+        self.assertIsNone(geo.simplify_geometry({"type": "Point", "coordinates": [0, 0]}))
+
+    def test_boundary_falls_back_from_gfw_to_wdpa(self):
+        from poseidon import geo
+        gfw = Mock()
+        gfw._request.side_effect = GFWError("HTTP 404")
+        session = Mock()
+        ok = Mock(status_code=200)
+        ok.json.return_value = {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {
+            "type": "Polygon", "coordinates": [[[-92, -2], [-89, -2], [-89, 1], [-92, 1], [-92, -2]]]}}]}
+        session.get.return_value = ok
+        b = geo.fetch_boundary("11753", gfw=gfw, session=session)
+        self.assertIn("WDPA", b["source"])
+        self.assertEqual(b["bbox"], [-92, -2, -89, 1])
+        self.assertEqual(session.get.call_args.kwargs["params"]["where"], "WDPAID=11753")
+        session.get.return_value = Mock(status_code=500)
+        self.assertIsNone(geo.fetch_boundary("11753", gfw=gfw, session=session)["geometry"])
+
+    def test_news_is_placed_by_area_then_country_else_unplaced(self):
+        from poseidon import intel
+        areas = [{"mpa_id": "11753", "mpa_name": "Galápagos - Reserva Marina", "center_lat": -0.5, "center_lon": -90.5}]
+        self.assertEqual(intel.place("Fleet returns to the Galapagos boundary", areas)["place_type"], "mpa")
+        self.assertEqual(intel.place("Marine reserve patrols increase", areas)["place_type"], "none")   # generic words do not match
+        self.assertEqual(intel.place("Navy of Senegal seizes trawler", areas)["place_name"], "Senegal")
+        rows = intel.global_news(SampleSearch(), [{"mpa_id": "sample-2", "mpa_name": "Sample Seamount Sanctuary (synthetic)",
+                                                   "center_lat": -3.3, "center_lon": -88}], "2026-10-31", log=lambda *_: None)
+        self.assertEqual({r["place_type"] for r in rows}, {"mpa", "country", "none"})
+
+    def test_snapshot_carries_outlines_and_global_news(self):
+        from poseidon import geo
+        from poseidon.sample import SAMPLE_BOUNDARIES
+        out = run(make_ctx(), max_cases=1, per_area=True)
+        self.assertEqual(sum(c["status"] != "queued" for c in out["cases"]), 2)   # one per area
+        g = geo.simplify_geometry(SAMPLE_BOUNDARIES["sample-1"])
+        bbox, lat, lon = geo.bbox_and_center(g)
+        shapes = [{"mpa_id": "sample-1", "mpa_name": "x", "geometry": g, "bbox": bbox, "center_lat": lat, "center_lon": lon, "source": "synthetic"},
+                  {"mpa_id": "999", "mpa_name": "Not investigated yet", "geometry": g, "bbox": bbox, "center_lat": 1, "center_lon": 2, "source": "synthetic"}]
+        snap = contract.build_snapshot(out["run"], out["cases"], out["events"], out["steps"], [], [], "now",
+                                       boundaries=shapes, global_news=[{"news_id": "a", "title": "t"}])
+        by_id = {m["mpa_id"]: m for m in snap["mpas"]}
+        self.assertEqual(by_id["sample-1"]["boundary"]["type"], "MultiPolygon")
+        self.assertIsNone(by_id["sample-2"]["boundary"])
+        self.assertIsNotNone(by_id["sample-2"]["center_lat"])    # centred on its cases
+        self.assertEqual(by_id["999"]["n_cases"], 0)             # outline-only area still on the globe
+        self.assertEqual(len(snap["global_news"]), 1)
+        json.dumps(snap)
+
+    def test_several_search_terms(self):
+        mpas = [{"id": 1, "label": "Galápagos - Reserva Marina"}, {"id": 2, "label": "Îles Galápagos"},
+                {"id": 3, "label": "Archipiélago de Colón (Galápagos)"}, {"id": 4, "label": "Revillagigedo"}]
+        got = pipeline.select_mpas(mpas, search="galapagos, revillagigedo")
+        self.assertEqual([m["mpa_id"] for m in got], ["1", "2", "4"])    # at most 2 per term
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,13 @@ SAMPLE_MPAS = [{"id": "sample-1", "label": "Sample Marine Reserve (synthetic)"},
                {"id": "sample-2", "label": "Sample Seamount Sanctuary (synthetic)"}]
 
 
+def _box(west, south, east, north):
+    return {"type": "Polygon", "coordinates": [[[west, south], [east, south], [east, north], [west, north], [west, south]]]}
+
+
+SAMPLE_BOUNDARIES = {"sample-1": _box(-92.6, -2.0, -88.9, 1.2), "sample-2": _box(-89.2, -4.2, -86.9, -2.4)}
+
+
 def _event(eid, start, end, vessel, **extra):
     return {"id": eid, "start": start, "end": end, "vessel": vessel, **extra}
 
@@ -155,6 +162,14 @@ class SampleSearch:
             return {**base, "answer": "Synthetic example: industrial fishing is prohibited throughout the reserve.",
                     "sources": [{"title": "Synthetic: reserve management plan", "url": "https://example.org/synthetic/rules",
                                  "snippet": "Invented example. Industrial fishing is prohibited inside the reserve."}]}
+        if "anywhere in the world" in query:
+            return {**base, "answer": "Synthetic example.",
+                    "sources": [{"title": "Synthetic: patrol detains vessel off Ecuador", "url": "https://example.org/synthetic/global-1",
+                                 "snippet": "Invented example. A fishing vessel was detained off Ecuador."},
+                                {"title": "Synthetic: fleet reported near Sample Seamount Sanctuary", "url": "https://example.org/synthetic/global-2",
+                                 "snippet": "Invented example. Vessels gathered near the Seamount sanctuary boundary."},
+                                {"title": "Synthetic: new satellite programme announced", "url": "https://example.org/synthetic/global-3",
+                                 "snippet": "Invented example with no place named."}]}
         if "Latest news" in query:
             return {**base, "answer": "Synthetic example: patrols reported a large squid fleet near the reserve boundary this month.",
                     "sources": [{"title": "Synthetic: fleet gathers at reserve boundary", "url": "https://example.org/synthetic/news-1",

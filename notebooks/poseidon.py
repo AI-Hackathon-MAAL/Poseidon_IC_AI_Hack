@@ -24,7 +24,7 @@ import sys, json, html, types
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-MODULES = ["gfw", "search", "scoring", "agent", "brief", "pipeline", "contract", "sample"]   # dependency order
+MODULES = ["gfw", "search", "scoring", "agent", "brief", "pipeline", "contract", "sample", "geo", "intel"]   # dependency order
 roots = [Path.cwd(), *Path.cwd().parents]
 try:  # Databricks can run a notebook with a working directory outside the Git folder
     nb_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
@@ -86,7 +86,7 @@ except Exception as first_error:
         del sys.modules[name]
     repo = load_via_workspace_api()
 
-from poseidon import contract, pipeline, sample
+from poseidon import contract, geo, intel, pipeline, sample
 from poseidon.agent import Context
 from poseidon.gfw import GFWClient, resolve_window
 from poseidon.search import SearchClient
@@ -111,12 +111,13 @@ dbutils.widgets.text("catalog", "workspace")
 dbutils.widgets.text("schema", "poseidon")
 dbutils.widgets.dropdown("reset_tables", "false", ["false", "true"])
 dbutils.widgets.dropdown("snapshot_to_repo", "true", ["true", "false"])
-dbutils.widgets.dropdown("snapshot_scope", "this_run_areas", ["this_run_areas", "all_areas"])
+dbutils.widgets.dropdown("snapshot_scope", "all_areas", ["all_areas", "this_run_areas"])
+dbutils.widgets.dropdown("global_news", "true", ["true", "false"])
 
 W = {k: dbutils.widgets.get(k).strip() for k in
      ["mode", "start_date", "end_date", "lookback_days", "mpa_search", "mpa_ids", "max_cases", "max_steps", "focus",
       "force_reinvestigate", "data_source", "search_provider", "llm_endpoint", "catalog", "schema", "reset_tables",
-      "snapshot_to_repo", "snapshot_scope"]}
+      "snapshot_to_repo", "snapshot_scope", "global_news"]}
 CATALOG, SCHEMA = W["catalog"], W["schema"]
 if not all(x.replace("_", "").isalnum() for x in (CATALOG, SCHEMA)):
     raise ValueError("catalog and schema may only contain letters, numbers and underscores")
@@ -232,9 +233,9 @@ for m in mpas:
     print(f"  {m['mpa_id']}  {m['mpa_name']}")
 if not mpas:
     dbutils.notebook.exit("No protected area matched. Change mpa_search or set mpa_ids.")
-if len(mpas) > 5:
-    print(f"NOTE: {len(mpas)} areas matched; using the first 5. Set mpa_ids to choose.")
-    mpas = mpas[:5]
+if len(mpas) > 12:
+    print(f"NOTE: {len(mpas)} areas matched; using the first 12. Set mpa_ids to choose.")
+    mpas = mpas[:12]
 
 # COMMAND ----------
 
@@ -269,7 +270,7 @@ print(f"Memory: {len(memory)} case(s) remembered from earlier runs\n")
 
 ctx = Context(gfw=gfw, search=search, llm=llm, window_start=window_start, window_end=window_end,
               mode=W["mode"], max_steps=int(W["max_steps"]))
-result = pipeline.run(ctx, mpas, memory=memory, max_cases=int(W["max_cases"]),
+result = pipeline.run(ctx, mpas, memory=memory, max_cases=int(W["max_cases"]), per_area=True,
                       force=W["force_reinvestigate"] == "true",
                       focus=[f for f in W["focus"].split(",") if f.strip()], llm_endpoint=LLM_ENDPOINT)
 run_row = result["run"][0]
@@ -284,6 +285,7 @@ for note in run_row["notes"]:
 
 # COMMAND ----------
 
+from datetime import datetime, timezone
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StructField, StringType
 
@@ -319,6 +321,28 @@ save("runs", result["run"])
 save("news", result["news"])
 save("mpa_context", result["mpa_context"])
 
+# Outlines for the map: fetched once per area, then remembered
+have = {b["mpa_id"] for b in read_rows("mpa_boundaries") if b.get("geometry")}
+new_shapes = []
+for m in mpas:
+    if m["mpa_id"] in have:
+        continue
+    if SAMPLE:
+        g = geo.simplify_geometry(sample.SAMPLE_BOUNDARIES.get(m["mpa_id"]))
+        bbox, lat, lon = geo.bbox_and_center(g)
+        b = {"geometry": g, "bbox": bbox, "center_lat": lat, "center_lon": lon, "source": "synthetic"}
+    else:
+        b = geo.fetch_boundary(m["mpa_id"], gfw=gfw)
+    print(f"  outline for {m['mpa_name']}: " + (f"ok ({b['source']})" if b.get("geometry") else f"not found ({b.get('error')})"))
+    new_shapes.append({**m, **b, "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+save("mpa_boundaries", new_shapes)
+
+# Global intel layer: worldwide news, placed on the map by area or country name
+if W["global_news"] == "true" and search is not None:
+    areas = [b for b in read_rows("mpa_boundaries")]
+    save("global_news", intel.global_news(search, areas, window_end, mode=W["mode"], window_start=window_start,
+                                          run_id=run_row["run_id"]))
+
 all_cases, all_events = read_rows("cases"), read_rows("events")
 save("mpa_status", contract.mpa_status_rows(all_cases, all_events), overwrite=True)
 
@@ -342,7 +366,9 @@ case_ids = {c["case_id"] for c in scoped(all_cases)}
 snapshot = contract.build_snapshot(run_rows, scoped(all_cases), scoped(all_events),
                                    [s for s in read_rows("agent_steps") if s.get("case_id") in case_ids],
                                    scoped(read_rows("news")), scoped(read_rows("mpa_context")),
-                                   datetime.now(timezone.utc).isoformat(timespec="seconds"))
+                                   datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                                   boundaries=scoped(read_rows("mpa_boundaries")),
+                                   global_news=read_rows("global_news"))
 print("Snapshot covers:", ", ".join(m["mpa_name"] for m in snapshot["mpas"]) or "no areas yet")
 snapshot_json = json.dumps(snapshot, default=str, ensure_ascii=False, indent=1)
 try:
@@ -360,7 +386,11 @@ if W["snapshot_to_repo"] == "true":
     try:
         repo_file.write_text(snapshot_json, encoding="utf-8")
         print(f"Snapshot copied into the Git folder: {repo_file}")
-        print("To share it: click the branch name (main) at the top -> tick this file -> Commit & Push.")
+        if not SAMPLE:   # search index of every protected area, so the UI can find ones not yet investigated
+            index = [{"id": str(m.get("id")), "name": m.get("label") or m.get("name")} for m in gfw.mpas()]
+            (repo / "data" / "mpa_index.json").write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+            print(f"Search index written: data/mpa_index.json ({len(index)} protected areas)")
+        print("To share them: click the branch name (main) at the top -> tick the data/ files -> Commit & Push.")
     except Exception as e:
         print(f"Could not copy the snapshot into the Git folder ({str(e)[:200]}).")
 
