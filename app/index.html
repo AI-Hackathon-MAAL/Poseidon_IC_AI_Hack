@@ -70,7 +70,7 @@
         <div class="case-actions">
           <button id="clear-point" class="point-dismiss text-button" type="button" hidden>← Back to globe</button>
           <button id="focus-area" type="button" class="secondary-button" disabled>Focus area <span aria-hidden="true">⌖</span></button>
-          <button id="investigate" type="button" class="primary-button" aria-describedby="investigation-status" disabled><span id="investigate-label">Investigate now</span> <span aria-hidden="true">↗</span></button>
+          <button id="investigate" type="button" class="primary-button" aria-describedby="investigation-status" disabled><span id="investigate-label">Generate report</span> <span aria-hidden="true">↗</span></button>
           <p id="investigation-status" class="investigation-status" role="status" hidden></p>
           <button id="open-brief" type="button" class="text-button" disabled>Open saved brief</button>
         </div>
@@ -87,6 +87,7 @@
   </main>
   <dialog id="brief-dialog" class="evidence-drawer" aria-labelledby="brief-title">
     <div class="drawer-heading"><div><p class="eyebrow">Agent report</p><h2 id="brief-title">Vessel investigation</h2></div><button id="close-brief" class="close-button" type="button" aria-label="Close agent report">×</button></div>
+    <div id="report-status" class="report-status" role="status" hidden></div>
     <figure id="report-photo" class="vessel-photo" hidden></figure>
     <div id="brief"></div>
     <details class="activity-panel"><summary>Agent trace</summary><div id="timeline" class="timeline"></div></details>

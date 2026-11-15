@@ -28,7 +28,7 @@ function measurement(value, unit) {
   return Number.isFinite(number) && number >= 0 ? numberFormat.format(number) + ' ' + unit : null;
 }
 
-export function startWorkspace({$, make, date, safeLink, renderReport}) {
+export function startWorkspace({$, make, date, safeLink, loadReportRenderer}) {
   let catalog, revision, loading;
   let groups = [], anchors = [], areaEvents = [], datedPositions = [], vessel = null, selected = null, point = null;
   let groupIndex = new Map(), areaIndex = new Map();
@@ -505,12 +505,36 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     upOneLevel();
     focusMap();
   });
-  function openReport(record) {
-    if (!hasReport(record)) return;
-    renderReport(record, catalog);
-    renderVesselPhoto($('report-photo'), record);
+  let reportRequest = 0;
+  async function openReport(record) {
+    if (!record?.snapshotCase || briefDialog.open) return;
+    const request = ++reportRequest;
+    const publication = catalog;
+    const status = $('report-status');
+    briefDialog.querySelector('.eyebrow').textContent = 'Vessel report';
+    $('brief-title').textContent = record.vessel || record.snapshotCase.vessel_name || 'Unidentified vessel';
+    $('brief').setAttribute('aria-busy', 'true');
+    briefDialog.dataset.reportState = 'loading';
+    status.textContent = 'Preparing report from snapshot…';
+    status.hidden = false;
     briefDialog.showModal();
     briefDialog.scrollTop = 0;
+    try {
+      // Keep the status readable even when the browser has cached the renderer.
+      const [render] = await Promise.all([loadReportRenderer(), new Promise(resolve => setTimeout(resolve, 950))]);
+      if (!briefDialog.open || request !== reportRequest) return;
+      render(record, publication);
+      renderVesselPhoto($('report-photo'), record);
+      delete briefDialog.dataset.reportState;
+      status.hidden = true;
+    } catch (error) {
+      if (!briefDialog.open || request !== reportRequest) return;
+      console.error('Could not prepare the vessel report.', error);
+      briefDialog.dataset.reportState = 'error';
+      status.textContent = 'The report could not be prepared. Close this panel and try again.';
+    } finally {
+      if (request === reportRequest) $('brief').removeAttribute('aria-busy');
+    }
   }
   $('view-export').addEventListener('click', showDataset);
   $('close-export').addEventListener('click', () => $('export-dialog').close());

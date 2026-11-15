@@ -1,6 +1,6 @@
 # Poseidon vessel explorer
 
-Select a ship on the globe or in the explorer to see its latest recorded position. Move the time slider left to visit earlier observations. **Investigation** switches between protected-area cases for the same vessel. **View agent report** opens the published risk score, review priority, evidence confidence and main finding. Expand **Score breakdown** to see what contributed points, or expand **Agent trace** and select **Replay agent trace** to follow the recorded decisions. Queued cases display **Awaiting investigation**.
+Select a ship on the globe or in the explorer to see its latest recorded position. Move the time slider left to visit earlier observations. **Investigation** switches between protected-area cases for the same vessel. In the snapshot demo, **Generate report** assembles the selected case from the published export. Investigated cases show the agent’s findings, score breakdown and replayable trace. Queued cases show **Awaiting investigation** and their recorded AIS observations.
 
 The fleet index includes every published vessel, even without a mappable position or completed report. Ships and tracked gear have separate counts; turn off **Include tracked fishing gear** for ships only. **Area details** narrows the fleet by event type, minimum risk and vessel identity. Breadcrumbs or Escape take you from the vessel back to its area and then the globe.
 

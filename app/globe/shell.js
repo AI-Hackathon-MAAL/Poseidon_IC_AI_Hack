@@ -81,14 +81,17 @@ replay.addEventListener('click', () => {
   reveal();
 });
 $('brief-dialog').addEventListener('close', stopReplay);
-Promise.all([import('./workspace.mjs'), import('./agent-report.mjs')]).then(([{startWorkspace}, {renderAgentReport}]) => {
-  function renderReport(record, catalog) {
+async function loadReportRenderer() {
+  const {renderAgentReport} = await import('./agent-report.mjs');
+  return (record, catalog) => {
     stopReplay();
     renderAgentReport(record, catalog, {date});
     replay.hidden = !timeline.querySelector('.step');
     progress.textContent = '';
-  }
-  startWorkspace({$, make, date, safeLink, renderReport});
+  };
+}
+import('./workspace.mjs').then(({startWorkspace}) => {
+  startWorkspace({$, make, date, safeLink, loadReportRenderer});
 }).catch(() => {
   $('data-mode').textContent = 'Workspace unavailable';
   $('case-title').textContent = 'Unable to open the investigation workspace';

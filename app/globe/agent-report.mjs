@@ -127,6 +127,22 @@ function downloadBrief(record, markdown) {
   return button;
 }
 
+function appendObservations(body, events, raw, date, open = false) {
+  const observations = section(body, 'AIS observations', count(events.length, 'event'), open);
+  if ([raw.vessel_type, ...rows(raw.evidence?.resolve_identity?.ship_types)].some(v => String(v).toLowerCase() === 'gear')) {
+    observations.append(node('p', 'AIS identifies this signal as tracked gear. Its associated vessel is unconfirmed.'));
+  }
+  if (events.some(e => e.event_type === 'gap')) observations.append(node('p', 'AIS positions bracket the reporting gap. The route and activity between those observations remain unknown.'));
+  for (const event of events) {
+    const block = node('div', null, 'report-observation');
+    const length = Number.parseFloat(event.duration_hours);
+    block.append(node('strong', eventLabels[event.event_type] || event.event_type || 'Observation'),
+      node('small', [date(event.start_time),date(event.end_time)].join(' → ') + (Number.isFinite(length) ? ' · ' + Number(length.toFixed(2)) + ' h' : '')));
+    observations.append(block);
+  }
+  if (!events.length) observations.append(node('p', 'No observations were attached to this case.'));
+}
+
 export function renderAgentReport(record, catalog, {date}) {
   const raw = record.snapshotCase, snapshot = catalog.snapshot;
   const dialog = document.getElementById('brief-dialog'), body = document.getElementById('brief');
@@ -138,12 +154,36 @@ export function renderAgentReport(record, catalog, {date}) {
   const level = ['high','medium','low'].includes(raw.risk_level) ? raw.risk_level : 'unknown';
   const status = {complete:'Complete', incomplete:'Incomplete', queued:'Awaiting investigation'}[raw.status] || '—';
   const who = {llm: record.synthetic ? 'Scripted model' : 'Model', policy:'Policy', template:'Template'};
+  const written = typeof raw.brief_markdown === 'string' ? raw.brief_markdown.trim() : '';
+  const observationOnly = raw.status === 'queued' || !written;
+  const source = record.synthetic ? 'Synthetic snapshot' : 'Published Databricks snapshot';
   document.getElementById('brief-title').textContent = record.vessel || raw.vessel_name || 'Unidentified vessel';
+  dialog.querySelector('.drawer-heading .eyebrow').textContent = observationOnly ? 'Observation report' : 'Agent report';
+  document.getElementById('close-brief').setAttribute('aria-label', 'Close report');
+  // Keep the replay elements inside the dialog when switching between report types.
+  body.after(tracePanel);
+  tracePanel.hidden = observationOnly;
   body.replaceChildren();
   body.className = 'agent-report';
   const heading = node('div', null, 'report-overview');
   heading.dataset.level = level;
   const place = node('p', region?.mpa_name || raw.mpa_name || '—', 'report-area');
+  if (observationOnly) {
+    document.getElementById('timeline').replaceChildren();
+    tracePanel.open = false;
+    heading.append(place, node('p', raw.status === 'queued' ? status : 'Agent brief unavailable', 'report-finding'));
+    const byline = node('div', null, 'report-byline');
+    byline.append(node('small', source));
+    const identity = node('dl', null, 'report-facts');
+    field(identity, 'MMSI', raw.mmsi);
+    field(identity, 'Flag', raw.flag);
+    field(identity, 'First recorded event', date(raw.first_event_at));
+    field(identity, 'Last recorded event', date(raw.last_event_at));
+    heading.append(byline, identity);
+    body.append(heading);
+    appendObservations(body, events, raw, date, true);
+    return;
+  }
   const scoreBlock = node('div', null, 'report-score');
   scoreBlock.append(node('span', 'Risk score', 'report-label'));
   const score = node('strong', present(raw.risk_score) ? raw.risk_score : '—');
@@ -166,10 +206,9 @@ export function renderAgentReport(record, catalog, {date}) {
   heading.append(place, assessment, node('p', raw.headline || record.title || '—', 'report-finding'));
   body.append(heading);
 
-  const written = typeof raw.brief_markdown === 'string' ? raw.brief_markdown.trim() : '';
   const byline = node('div', null, 'report-byline');
-  byline.append(node('small', [record.synthetic && 'Synthetic case', raw.investigated_at && 'Investigated ' + date(raw.investigated_at)].filter(Boolean).join(' · ')));
-  if (written) byline.append(downloadBrief(raw, raw.brief_markdown));
+  byline.append(node('small', [source, raw.investigated_at && 'Investigated ' + date(raw.investigated_at)].filter(Boolean).join(' · ')));
+  byline.append(downloadBrief(raw, raw.brief_markdown));
   body.append(byline);
 
   const factors = section(body, 'Score breakdown', count(reasons.length, 'factor'));
@@ -190,23 +229,10 @@ export function renderAgentReport(record, catalog, {date}) {
     gaps.append(list);
   } else gaps.append(node('p', 'No gaps flagged in this investigation.'));
   const brief = section(body, 'Investigation brief', who[raw.brief_written_by] || '');
-  if (written) markdown(brief, written, sources, true);
-  else brief.append(node('p', 'A written brief was unavailable.'));
+  markdown(brief, written, sources, true);
   body.append(tracePanel);
 
-  const observations = section(body, 'AIS observations', count(events.length, 'event'));
-  if ([raw.vessel_type, ...rows(raw.evidence?.resolve_identity?.ship_types)].some(v => String(v).toLowerCase() === 'gear')) {
-    observations.append(node('p', 'AIS identifies this signal as tracked gear. Its associated vessel is unconfirmed.'));
-  }
-  if (events.some(e => e.event_type === 'gap')) observations.append(node('p', 'AIS positions bracket the reporting gap. The route and activity between those observations remain unknown.'));
-  for (const event of events) {
-    const block = node('div', null, 'report-observation');
-    const length = Number.parseFloat(event.duration_hours);
-    block.append(node('strong', eventLabels[event.event_type] || event.event_type || 'Observation'),
-      node('small', [date(event.start_time),date(event.end_time)].join(' → ') + (Number.isFinite(length) ? ' · ' + Number(length.toFixed(2)) + ' h' : '')));
-    observations.append(block);
-  }
-  if (!events.length) observations.append(node('p', 'No observations were attached to this case.'));
+  appendObservations(body, events, raw, date);
   const rules = section(body, 'Protected-area rules');
   const references = rows(region?.rules_sources).map((s,i)=>({...s,n:s.n ?? i+1}));
   if (region?.rules_summary) {

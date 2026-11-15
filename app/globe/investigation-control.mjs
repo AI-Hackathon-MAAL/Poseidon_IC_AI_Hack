@@ -32,11 +32,10 @@ export function mountInvestigationControl({button, label, note, refreshPublicati
     note.hidden = !description;
   }
   function render() {
-    if (!selected) return show('Investigate now', true);
-    if (hasReport(selected)) return show('View agent report', false);
+    if (!selected) return show('Generate report', true);
+    if (!enabled || hasReport(selected)) return show('Generate report', false);
     if (selected.snapshotCase.status !== 'queued') return show('Report unavailable', true);
     if (selected.synthetic) return show('Awaiting investigation', true, 'This example uses synthetic data.');
-    if (!enabled) return show('Awaiting investigation', true, 'Open a Poseidon workspace connected to the Databricks investigation job to start this case.');
     if (!selected.snapshotCase.fingerprint) return show('Awaiting investigation', true, 'Refresh the publication to get a case that can be submitted.');
     const job = jobs.get(selected.id);
     if (!job) return show('Investigate now', false);
@@ -121,8 +120,8 @@ export function mountInvestigationControl({button, label, note, refreshPublicati
   }
   button.addEventListener('click', () => {
     if (!selected || button.disabled) return;
-    if (hasReport(selected)) { openReport(selected); return; }
-    if (!enabled || selected.synthetic || selected.snapshotCase.status !== 'queued') return;
+    if (!enabled || hasReport(selected)) { openReport(selected); return; }
+    if (selected.synthetic || selected.snapshotCase.status !== 'queued') return;
     const job = jobs.get(selected.id);
     if (job?.busy) return;
     if (job?.runId && job.state !== 'failed') {

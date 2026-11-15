@@ -2,6 +2,29 @@
 #brief-dialog .drawer-heading { padding-block: 20px 16px; align-items: flex-start; }
 #brief-dialog .drawer-heading h2 { font-size: clamp(24px, 4vw, 32px); line-height: 1.12; overflow-wrap: anywhere; }
 #brief-dialog #report-photo:not([hidden]) { margin-block: 16px 0; }
+#brief-dialog[data-report-state] :is(#brief, #report-photo, .activity-panel) { display: none; }
+.report-status:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 120px;
+  color: var(--muted);
+  font: 13px/1.5 var(--sans);
+}
+#brief-dialog[data-report-state="loading"] .report-status::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--line);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: report-spin .85s linear infinite;
+}
+@keyframes report-spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) {
+  #brief-dialog[data-report-state="loading"] .report-status::before { animation: none; }
+}
 .agent-report { overflow-wrap: anywhere; }
 .report-overview { --risk: var(--ink); padding: 16px 0 12px; }
 .report-overview[data-level="high"] { --risk: #edb59b; }
