@@ -29,7 +29,7 @@ const types = {
 // Images and fonts are already compressed, so they are sent as they are.
 const compressed = new Map();
 
-export async function serveGlobe(path, res, investigationsEnabled = false, acceptEncoding = '') {
+export async function serveGlobe(path, res, investigationsEnabled = false, acceptEncoding = '', snapshotInvestigations = false) {
   if (path === '/app') {
     res.writeHead(302, {Location: '/app/'}).end();
     return true;
@@ -43,6 +43,7 @@ export async function serveGlobe(path, res, investigationsEnabled = false, accep
     // Qualify the app's local assets for its root alias. Fragment links still
     // target the current page and preserve the analyst's selection.
     const page = template.replace('data-investigation-api=""', investigationsEnabled ? 'data-investigation-api="/api/investigations"' : 'data-investigation-api=""')
+      .replace('data-snapshot-investigation-api=""', snapshotInvestigations ? 'data-snapshot-investigation-api="/api/snapshot-investigations"' : 'data-snapshot-investigation-api=""')
       .replace('href="./globe/archive.html"', 'href="/archive"')
       .replaceAll('src="./', 'src="/app/').replaceAll('href="./', 'href="/app/');
     res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache'}).end(page);

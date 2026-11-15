@@ -506,32 +506,60 @@ export function startWorkspace({$, make, date, safeLink, loadReportRenderer}) {
     focusMap();
   });
   let reportRequest = 0;
+  async function generateSnapshotReport(record) {
+    const fingerprint = record.snapshotCase.fingerprint;
+    const response = await fetch('/api/snapshot-investigations', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({caseId: record.id, fingerprint}),
+      signal: AbortSignal.timeout(90000)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'The investigation could not be completed.');
+    if (result.case?.case_id !== record.id || result.case.fingerprint !== fingerprint ||
+        !hasReport({snapshotCase:result.case})) throw new Error('The investigation returned an unexpected report.');
+    // A publication read that started before the POST could still contain the queued case.
+    if (loading) await loading;
+    await refresh(false, true);
+    const updated = catalog.cases.find(row => row.id === record.id);
+    if (updated?.snapshotCase.fingerprint !== fingerprint || !hasReport(updated)) {
+      throw new Error('The publication changed. Select the case again to see its latest report.');
+    }
+    return updated;
+  }
   async function openReport(record) {
     if (!record?.snapshotCase || briefDialog.open) return;
     const request = ++reportRequest;
-    const publication = catalog;
+    const published = catalog;
+    const generate = document.documentElement.dataset.snapshotInvestigationApi === '/api/snapshot-investigations' &&
+      !record.synthetic && Boolean(record.snapshotCase.fingerprint) && !hasReport(record);
     const status = $('report-status');
     briefDialog.querySelector('.eyebrow').textContent = 'Vessel report';
     $('brief-title').textContent = record.vessel || record.snapshotCase.vessel_name || 'Unidentified vessel';
     $('brief').setAttribute('aria-busy', 'true');
     briefDialog.dataset.reportState = 'loading';
-    status.textContent = 'Preparing report from snapshot…';
+    status.textContent = generate ? 'Investigating snapshot evidence and calculating the score…' : 'Preparing report from snapshot…';
     status.hidden = false;
     briefDialog.showModal();
     briefDialog.scrollTop = 0;
     try {
       // Keep the status readable even when the browser has cached the renderer.
-      const [render] = await Promise.all([loadReportRenderer(), new Promise(resolve => setTimeout(resolve, 950))]);
+      const [render, report] = await Promise.all([
+        loadReportRenderer(),
+        generate ? generateSnapshotReport(record) : record,
+        new Promise(resolve => setTimeout(resolve, 950))
+      ]);
       if (!briefDialog.open || request !== reportRequest) return;
-      render(record, publication);
-      renderVesselPhoto($('report-photo'), record);
+      render(report, generate ? catalog : published);
+      renderVesselPhoto($('report-photo'), report);
       delete briefDialog.dataset.reportState;
       status.hidden = true;
     } catch (error) {
       if (!briefDialog.open || request !== reportRequest) return;
       console.error('Could not prepare the vessel report.', error);
       briefDialog.dataset.reportState = 'error';
-      status.textContent = 'The report could not be prepared. Close this panel and try again.';
+      const reason = generate && error.message ? error.message + ' ' : '';
+      status.textContent = reason + 'Close this panel and try generating the report again.';
     } finally {
       if (request === reportRequest) $('brief').removeAttribute('aria-busy');
     }

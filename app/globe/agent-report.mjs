@@ -156,7 +156,9 @@ export function renderAgentReport(record, catalog, {date}) {
   const who = {llm: record.synthetic ? 'Scripted model' : 'Model', policy:'Policy', template:'Template'};
   const written = typeof raw.brief_markdown === 'string' ? raw.brief_markdown.trim() : '';
   const observationOnly = raw.status === 'queued' || !written;
-  const source = record.synthetic ? 'Synthetic snapshot' : 'Published Databricks snapshot';
+  const localReport = raw.report_origin === 'snapshot-python';
+  const source = localReport ? 'Generated locally from the published snapshot'
+    : record.synthetic ? 'Synthetic snapshot' : 'Published Databricks snapshot';
   document.getElementById('brief-title').textContent = record.vessel || raw.vessel_name || 'Unidentified vessel';
   dialog.querySelector('.drawer-heading .eyebrow').textContent = observationOnly ? 'Observation report' : 'Agent report';
   document.getElementById('close-brief').setAttribute('aria-label', 'Close report');
@@ -259,9 +261,9 @@ export function renderAgentReport(record, catalog, {date}) {
   const provenance = section(body, 'Investigation record');
   const metadata = node('dl', null, 'report-facts');
   for (const [key,value] of [
-    ['Data source',catalog.origin],['Run',raw.run_id],['Mode',raw.mode],
+    ['Data source',source],['Run',raw.run_id],['Mode',raw.mode],
     ['Window',[raw.window_start,raw.window_end].filter(Boolean).map(date).join(' – ')],
-    ['Brief writer',who[raw.brief_written_by]],['Model endpoint',run?.llm_endpoint],['Search provider',run?.search_provider],
+    ['Brief writer',who[raw.brief_written_by]],['Model endpoint',localReport ? null : run?.llm_endpoint],['Search provider',localReport ? 'Snapshot evidence' : run?.search_provider],
     ['Model decisions',raw.llm_decisions],['Policy decisions',raw.policy_decisions]
   ]) field(metadata,key,value);
   provenance.append(metadata);

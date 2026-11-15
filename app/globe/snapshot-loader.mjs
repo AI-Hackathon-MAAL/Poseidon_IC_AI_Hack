@@ -1,5 +1,8 @@
-import {validatePublishedExport} from '../../public/published-export.mjs';
-export {exportRevision} from '../../public/published-export.mjs';
+import {validatePublishedExport, exportRevision as publicationRevision} from '../../public/published-export.mjs';
+
+export function exportRevision(data) {
+  return JSON.stringify([publicationRevision(data), data.local_report_revision ?? null]);
+}
 
 const published = new URL('../../data/poseidon_snapshot.json', import.meta.url);
 const sample = new URL('../../data/poseidon_snapshot.sample.json', import.meta.url);

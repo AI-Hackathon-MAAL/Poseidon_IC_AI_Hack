@@ -16,7 +16,7 @@ function matchesCase(report, queued) {
     row.run_id && row.run_id === report.run?.run_id && Number.isFinite(Date.parse(report.run.finished_at));
 }
 
-function refreshArea(area, cases) {
+export function refreshArea(area, cases) {
   const records = cases.filter(row => String(row.mpa_id) === String(area.mpa_id));
   const count = predicate => records.filter(predicate).length;
   const dates = records.map(r => r.investigated_at).filter(Boolean).sort();

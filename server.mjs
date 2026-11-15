@@ -10,6 +10,7 @@ import { createSnapshotReader } from './snapshot.mjs';
 import { serveGlobe } from './app/host.mjs';
 import { createInvestigationJobs, validInvestigationKey } from './app/investigation-jobs.mjs';
 import { createResultReader } from './app/investigation-results.mjs';
+import { createSnapshotInvestigations } from './app/snapshot-investigations.mjs';
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const assets = new Map([
@@ -69,10 +70,16 @@ async function save(dir, brief) {
   }
 }
 
-export function createApp({dataDir = resolve(root,'.soundings','briefs'), candidates = loadCandidates, store = recordBrief, readStored = readBrief, search, model, lookupHistory, readSnapshot = createSnapshotReader(), jobs = createInvestigationJobs(), readResults = createResultReader()} = {}) {
+export function createApp({dataDir = resolve(root,'.soundings','briefs'), candidates = loadCandidates, store = recordBrief, readStored = readBrief, search, model, lookupHistory, readSnapshot = createSnapshotReader(), jobs = createInvestigationJobs(), readResults = createResultReader(), snapshotInvestigations = createSnapshotInvestigations(resolve(root,'.soundings','snapshot-investigations'))} = {}) {
   const pendingRuns = new Map();
+  const localAgentEnabled = Boolean(snapshotInvestigations) && !jobs.enabled && !process.env.POSEIDON_VOLUME && !process.env.DATABRICKS_APP_NAME;
+  function localPublication(snapshot) {
+    return localAgentEnabled && ['bundled-export', 'export'].includes(snapshot.source) &&
+      !snapshot.data.synthetic && snapshot.data.data_source !== 'sample';
+  }
   async function currentPublication() {
     const snapshot = await readSnapshot();
+    if (localPublication(snapshot)) return snapshotInvestigations.overlay(snapshot);
     if (!jobs.enabled || snapshot.source !== 'export' || snapshot.data.synthetic || snapshot.data.data_source === 'sample') return snapshot;
     return {...snapshot, data: await readResults(snapshot.data)};
   }
@@ -146,7 +153,31 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
           return json(res,503,{error:'The Databricks investigation service is unavailable. Try again shortly.'});
         }
       }
-      if (req.method === 'GET' && await serveGlobe(path, res, jobs.enabled, req.headers['accept-encoding'])) return;
+      if (path === '/api/snapshot-investigations' && req.method === 'POST') {
+        if (!localAgentEnabled) return json(res,503,{error:'Local snapshot investigations are unavailable on this host.'});
+        const {origin, host, 'sec-fetch-site':site} = req.headers;
+        // HTTPS proxies can preserve Host while terminating TLS. Browsers supply
+        // Sec-Fetch-Site; cross-origin scripts cannot set it or the Host header.
+        const sameHostHttps = origin === 'https://' + host && (site === 'same-origin' || req.socket.encrypted);
+        if (site === 'cross-site' || (origin && origin !== 'http://' + host && !sameHostHttps)) {
+          return json(res,403,{error:'Open Poseidon to request this investigation.'});
+        }
+        if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(res,415,{error:'Send a JSON case ID.'});
+        let input;
+        try { input = await body(req); } catch { return json(res,400,{error:'Supply a case ID and fingerprint.'}); }
+        if (!validInvestigationKey(input?.caseId,input?.fingerprint)) return json(res,400,{error:'Select a case with identifiable observations.'});
+        try {
+          const publication = await readSnapshot();
+          if (!localPublication(publication)) return json(res,409,{error:'Select a case from a real local publication.'});
+          const row = await snapshotInvestigations.generate(publication, input.caseId, input.fingerprint);
+          return json(res,200,{case:row});
+        } catch (error) {
+          if (Number.isInteger(error.status) && error.status >= 400 && error.status <= 599) return json(res,error.status,{error:error.message});
+          console.error('Snapshot investigation failed', error.code || error.name);
+          return json(res,503,{error:'The snapshot or its report store is unavailable. Try again.'});
+        }
+      }
+      if (req.method === 'GET' && await serveGlobe(path, res, jobs.enabled, req.headers['accept-encoding'], localAgentEnabled)) return;
       if (req.method === 'GET' && assets.has(path)) {
         const [filename,type] = assets.get(path);
         const content = await readAsset(filename);

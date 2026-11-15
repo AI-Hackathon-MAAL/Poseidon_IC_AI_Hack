@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {mkdtemp, rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {createApp} from '../server.mjs';
 import {createInvestigationJobs} from './investigation-jobs.mjs';
 import {createResultReader} from './investigation-results.mjs';
+import {createSnapshotInvestigations} from './snapshot-investigations.mjs';
 
 test('a queued case launches once and publishes only the matching observations', async t => {
   const row = {case_id:'12:boat', mpa_id:'12', vessel_id:'boat', fingerprint:'012345abcdef', status:'queued',
@@ -67,4 +71,65 @@ test('a queued case launches once and publishes only the matching observations',
   row.fingerprint = '112345abcdef';
   assert.equal((await read()).cases[0].status,'queued');
   assert.equal(attempts.length,2);
+});
+
+test('snapshot reports survive a reopen and belong only to their source publication', async t => {
+  const directory = await mkdtemp(join(tmpdir(),'poseidon-snapshot-'));
+  t.after(() => rm(directory,{recursive:true,force:true}));
+  const row = {case_id:'12:ship',mpa_id:'12',vessel_id:'ship',fingerprint:'012345abcdef',
+    risk_score:30,risk_level:'low',status:'queued',events:[],steps:[]};
+  const data = {product:'Poseidon',cases:[row],mpas:[{mpa_id:'12',n_queued:1}],runs:[],news:[],global_news:[]};
+  const publication = {source:'bundled-export',data};
+  let runs = 0;
+  let unblock;
+  const waiting = new Promise(resolve => {unblock = resolve;});
+  const run = async () => {
+    runs++;
+    await waiting;
+    return {...row, report_origin:'snapshot-python', status:'incomplete', brief_markdown:'Offline evidence',
+      investigated_at:'2026-11-15T12:00:00Z', reasons:[],steps:[]};
+  };
+  const reports = createSnapshotInvestigations(directory,run);
+  const app = createApp({readSnapshot:async () => publication, jobs:{enabled:false}, snapshotInvestigations:reports});
+  await new Promise((resolve,reject) => {app.once('error',reject);app.listen(0,'127.0.0.1',resolve);});
+  t.after(() => new Promise(resolve => app.close(resolve)));
+  const origin = 'http://127.0.0.1:' + app.address().port;
+  const post = (fingerprint = row.fingerprint, requestOrigin = origin, extraHeaders = {}) => fetch(origin + '/api/snapshot-investigations', {
+    method:'POST', headers:{Origin:requestOrigin,'Content-Type':'application/json',...extraHeaders},
+    body:JSON.stringify({caseId:row.case_id, fingerprint})
+  });
+  assert.match(await (await fetch(origin)).text(), /data-snapshot-investigation-api="\/api\/snapshot-investigations"/);
+  assert.equal((await post(row.fingerprint,'https://example.org')).status,403);
+  const httpsOrigin = 'https://' + new URL(origin).host;
+  assert.equal((await post(row.fingerprint,httpsOrigin,{'Sec-Fetch-Site':'cross-site'})).status,403);
+  assert.equal((await post('dddddddddddd',httpsOrigin,{'Sec-Fetch-Site':'same-origin'})).status,409);
+  assert.equal((await post('dddddddddddd')).status,409);
+  row.run_id = 'mixed-import';
+  data.runs.push({run_id:row.run_id, data_source:'sample'});
+  assert.equal((await post()).status,409);
+  data.runs.length = 0;
+  assert.equal(runs,0);
+  const pair = [post(),post()];
+  unblock();
+  for (const response of await Promise.all(pair)) {
+    assert.equal(response.status,200);
+    assert.equal((await response.json()).case.brief_markdown,'Offline evidence');
+  }
+  assert.equal(runs,1);
+  assert.equal(data.cases[0].status,'queued');
+  const reopened = createSnapshotInvestigations(directory,run);
+  assert.equal((await reopened.generate(publication,row.case_id,row.fingerprint)).report_origin,'snapshot-python');
+  assert.equal(runs,1);
+  const result = await (await fetch(origin + '/api/snapshot')).json();
+  assert.equal(result.cases[0].status,'incomplete');
+  assert.equal(result.mpas[0].n_queued,0);
+  assert.ok(result.local_report_revision);
+
+  // A corrected area boundary can change the original risk rules even with identical events.
+  data.mpas[0].boundary = {type:'MultiPolygon',coordinates:[]};
+  assert.equal((await reopened.overlay(publication)).data.cases[0].status,'queued');
+  row.status='complete';
+  row.brief_markdown='Published notebook brief';
+  assert.equal((await reopened.generate(publication,row.case_id,row.fingerprint)).brief_markdown,row.brief_markdown);
+  assert.equal(runs,1);
 });

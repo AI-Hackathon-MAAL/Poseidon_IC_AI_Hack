@@ -1,6 +1,6 @@
 # Poseidon vessel explorer
 
-Select a ship on the globe or in the explorer to see its latest recorded position. Move the time slider left to visit earlier observations. **Investigation** switches between protected-area cases for the same vessel. In the snapshot demo, **Generate report** assembles the selected case from the published export. Investigated cases show the agent’s findings, score breakdown and replayable trace. Queued cases show **Awaiting investigation** and their recorded AIS observations.
+Select a ship on the globe or in the explorer to see its latest recorded position. Move the time slider left to visit earlier observations. **Investigation** switches between protected-area cases for the same vessel. In the local app, **Generate report** opens the selected case’s saved brief or runs Poseidon’s Python agent on the evidence in the real snapshot. The agent uses the repository’s scoring rules and brief template. Its score breakdown, recorded checks and uncertainties appear in the report. Generated reports are saved locally and can be reopened after a restart.
 
 The fleet index includes every published vessel, even without a mappable position or completed report. Ships and tracked gear have separate counts; turn off **Include tracked fishing gear** for ships only. **Area details** narrows the fleet by event type, minimum risk and vessel identity. Breadcrumbs or Escape take you from the vessel back to its area and then the globe.
 
@@ -10,8 +10,9 @@ Scroll or pinch over the globe to zoom. The **News markers** control toggles the
 
 From the repository root:
 
+- **Local Python reports:** Install the Python dependencies with `python -m pip install -r requirements.txt` before starting the Node app. Set `POSEIDON_PYTHON` to your Python executable if you use a virtual environment. Report generation uses the snapshot offline and stores results under `.soundings/snapshot-investigations/`. A new source snapshot gets its own reports.
 - **Local or Databricks-hosted app:** Run `npm start` with Node.js 22+ and open [Poseidon](http://127.0.0.1:3000/). To use a downloaded export, set `POSEIDON_SNAPSHOT_PATH` to the file. A Databricks App can read the notebook's exports volume using the resource in [app.yaml](../app.yaml). **About** opens the historical replay.
-- **Static preview:** Run `python -m http.server 3102 --bind 127.0.0.1` and open [the globe](http://127.0.0.1:3102/app/). Keep `app/`, `public/` (shared styles and helpers) and `data/` as siblings. The historical archive is read-only on a static host.
+- **Static preview:** Run `python -m http.server 3102 --bind 127.0.0.1` and open [the globe](http://127.0.0.1:3102/app/). Keep `app/`, `public/` (shared styles and helpers) and `data/` as siblings. This preview displays published briefs and an observation summary for cases awaiting investigation.
 
 The globe loads the real [Poseidon snapshot](../data/poseidon_snapshot.json) first. If the file is missing, contains invalid JSON, or fails the snapshot contract, the globe loads the sample and displays **SYNTHETIC DATA**. A network, permissions or service error shows the publication as unavailable. The browser needs no GFW, Linkup or Databricks keys.
 
