@@ -29,12 +29,12 @@ python python-app/app.py
 
 Then open `http://127.0.0.1:8000` (set `PORT` to change it).
 
-Optional live credentials: copy `python-app/.env.example` to `python-app/.env` (git-ignored) and fill in `GFW_TOKEN`, `LINKUP_API_KEY` (or `TAVILY_API_KEY`), and `DATABRICKS_HOST` + `DATABRICKS_TOKEN`. Never commit that file.
+Optional live credentials: copy `python-app/.env.example` to `python-app/.env` (git-ignored) and fill in `GFW_TOKEN`, `LINKUP_API_KEY`, and `DATABRICKS_HOST` + `DATABRICKS_TOKEN`. Never commit that file.
 
 ## Offline / Hybrid Mode vs. Live Mode
 
 - **Offline / Hybrid Mode (no API keys required):** `app.py` wraps `poseidon/` with `SnapshotGFWAdapter` and `SnapshotSearchAdapter`, allowing you to explore the globe, inspect existing briefs, and run `POST /api/investigate` locally against cached snapshot telemetry and search evidence without external API calls.
-- **Live Mode:** When `GFW_TOKEN`, `LINKUP_API_KEY`/`TAVILY_API_KEY`, and `DATABRICKS_HOST` + `DATABRICKS_TOKEN` are set, `POST /api/investigate` runs the live Python agent against external APIs, and `POST /api/sync-databricks` pulls the latest `poseidon_snapshot.json` from `POSEIDON_VOLUME` via the Databricks Files API.
+- **Live Mode:** When `GFW_TOKEN`, `LINKUP_API_KEY`, and `DATABRICKS_HOST` + `DATABRICKS_TOKEN` are set, `POST /api/investigate` runs the live Python agent against external APIs, and `POST /api/sync-databricks` pulls the latest `poseidon_snapshot.json` from `POSEIDON_VOLUME` via the Databricks Files API.
 
 ## API Endpoints
 

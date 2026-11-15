@@ -166,7 +166,7 @@ Open `notebooks/poseidon` from the Git folder, set the widgets, **Run all**.
 | `focus` | Comma-separated vessel names, ids or MMSIs to investigate first |
 | `force_reinvestigate` | Investigate again even if nothing changed |
 | `data_source` | `gfw` (real) or `sample` (synthetic; no keys needed; areas `sample-1`, `sample-2`) |
-| `search_provider` | `linkup`, `tavily` or `none` |
+| `search_provider` | `linkup` or `none` |
 | `llm_endpoint` | `auto` finds a working chat model in the workspace |
 | `reset_tables` | Drops every Poseidon table first. Set back to `false` afterwards |
 | `snapshot_scope` | `all_areas` (default): the snapshot contains every area investigated so far, for the globe. `this_run_areas`: only this run's areas |

@@ -352,7 +352,7 @@ class PoseidonStore:
             cases = self.snapshot.get("cases") or []
             mpas = self.snapshot.get("mpas") or []
             gfw_live = bool(_env("GFW_TOKEN"))
-            linkup_live = bool(_env("LINKUP_API_KEY") or _env("TAVILY_API_KEY"))
+            linkup_live = bool(_env("LINKUP_API_KEY"))
             db_live = bool(_env("DATABRICKS_HOST") and _env("DATABRICKS_TOKEN"))
             return {
                 "ok": True,
@@ -400,11 +400,8 @@ class PoseidonStore:
         gfw = GFWClient(gfw_token) if gfw_token else SnapshotGFWAdapter(snap_copy)
 
         linkup_key = _env("LINKUP_API_KEY")
-        tavily_key = _env("TAVILY_API_KEY")
         if linkup_key:
             search = SearchClient(linkup_key, provider="linkup")
-        elif tavily_key:
-            search = SearchClient(tavily_key, provider="tavily")
         else:
             search = SnapshotSearchAdapter(snap_copy)
 

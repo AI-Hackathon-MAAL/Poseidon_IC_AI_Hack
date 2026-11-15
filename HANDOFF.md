@@ -6,7 +6,7 @@ Read this first, then `AGENTS.md`, `docs/backend.md` and `docs/ui-spec.md`.
 ## 1. The situation
 
 - **Event:** Imperial AI hackathon, Autonomous Agents track. **Submission deadline: Sunday 15 Nov 2026, 12:00 London time.**
-- **Bounties targeted:** Databricks (main; scored on creativity, technical depth, real-world impact), Linkup (agent that researches and verifies fresh information with cited sources), possibly Tavily.
+- **Bounties targeted:** Databricks (main; scored on creativity, technical depth, real-world impact), Linkup (agent that researches and verifies fresh information with cited sources).
 - **Team:** Kingston (backend lead, owns this session), aarin (owns the GitHub org; wrote the earlier live monitor `notebooks/03_live_mpa_monitor.py`), Louis (front end, using ChatGPT Codex, building in `app/`).
 - **Repo:** `AI-Hackathon-MAAL/Imperial-AI-Hackathon` (private), branch `main`. Earlier lived at `aarinr/Imperial-AI-Hackathon`.
 - **Databricks:** Free Edition workspace `https://dbc-e6a70d48-0742.cloud.databricks.com`. Outbound internet works (GFW and Linkup reachable). Serverless only; one Databricks App allowed (stops after 24 h).
@@ -38,7 +38,7 @@ weights are judgement, not validated.
 | --- | --- | --- |
 | `notebooks/poseidon.py` | **The one notebook to run.** Widgets, connections, run, save tables, snapshot | Current |
 | `poseidon/gfw.py` | GFW v3 client (retries, pagination), `resolve_window()` (only difference between modes), `flatten_event()`, `summarize_identity()` | Current |
-| `poseidon/search.py` | Linkup (default) / Tavily client; returns `{answer, sources[]}`; retries without date filters on HTTP 400 | Current |
+| `poseidon/search.py` | Linkup client; returns `{answer, sources[]}`; retries without date filters on HTTP 400 | Current |
 | `poseidon/agent.py` | `Case`, 8 tools, `available_tools()`, `choose_next()` (LLM → JSON), `policy_choice()`, `investigate()` loop, `assess()` | Current, core |
 | `poseidon/scoring.py` | Deterministic score with reasons; `web_risk_hits()` only counts sources naming this vessel/owner AND a risk term | Current |
 | `poseidon/brief.py` | LLM brief from facts only, `clean_markdown()`, template fallback, caveat line | Current |

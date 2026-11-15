@@ -5,7 +5,7 @@
 # MAGIC Reads `candidates`, investigates each vessel-in-MPA lead (vessel history → web check → score → brief)
 # MAGIC and writes the `briefs` table the front end reads.
 # MAGIC
-# MAGIC Secrets used (missing ones are skipped gracefully): `hackathon/gfw_token`, `hackathon/linkup_key` or `hackathon/tavily_key`.
+# MAGIC Secrets used (missing ones are skipped gracefully): `hackathon/gfw_token`, `hackathon/linkup_key`.
 # MAGIC The brief is written by a Databricks Foundation Model endpoint; if it fails, a template brief is used.
 
 # COMMAND ----------
@@ -13,7 +13,7 @@
 dbutils.widgets.text("catalog", "workspace")
 dbutils.widgets.text("schema", "dark_fishing")
 dbutils.widgets.dropdown("source", "sample", ["sample", "gfw", "all"])
-dbutils.widgets.dropdown("search_provider", "linkup", ["linkup", "tavily"])
+dbutils.widgets.dropdown("search_provider", "linkup", ["linkup"])
 dbutils.widgets.text("llm_endpoint", "databricks-meta-llama-3-3-70b-instruct")
 dbutils.widgets.text("max_leads", "10")
 dbutils.widgets.text("start_date", "2025-01-01")

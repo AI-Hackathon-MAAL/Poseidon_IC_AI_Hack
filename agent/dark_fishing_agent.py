@@ -6,7 +6,7 @@ secrets, the LLM endpoint and the Delta tables.
 Flow per lead (one vessel in one MPA):
   1. gather   — the candidate events for that vessel/MPA
   2. history  — vessel identity history + its other recent events (GFW)
-  3. web      — live web search for news / sanctions / IUU listings (Linkup or Tavily)
+  3. web      — live web search for news / sanctions / IUU listings (Linkup)
   4. score    — transparent rule-based risk score with plain-language reasons
   5. brief    — LLM writes a one-page brief using ONLY the facts gathered above
 
@@ -130,15 +130,6 @@ class Tools:
         if not self.search_key:
             return {"error": "no search key", "sources": []}
         try:
-            if self.search_provider == "tavily":
-                r = requests.post("https://api.tavily.com/search", timeout=self.timeout,
-                                  headers={"Authorization": f"Bearer {self.search_key}"},
-                                  json={"query": query, "max_results": 5, "include_answer": True})
-                r.raise_for_status()
-                d = r.json()
-                return {"answer": d.get("answer"),
-                        "sources": [{"title": s.get("title"), "url": s.get("url"),
-                                     "snippet": (s.get("content") or "")[:400]} for s in d.get("results", [])]}
             r = requests.post("https://api.linkup.so/v1/search", timeout=self.timeout,
                               headers={"Authorization": f"Bearer {self.search_key}"},
                               json={"q": query, "depth": "standard", "outputType": "sourcedAnswer"})

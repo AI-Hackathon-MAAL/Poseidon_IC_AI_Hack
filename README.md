@@ -53,7 +53,7 @@ For each `(vessel, MPA)` lead, `agent/dark_fishing_agent.py` runs five steps and
 
 1. **Gather** — collects candidate events (`gap`, `fishing`, `encounter`, `loitering`) for the vessel in the selected MPA.
 2. **History** — queries Global Fishing Watch for vessel name/flag history and recent event counts.
-3. **Web search** — queries Linkup or Tavily for news, sanctions, or IUU fishing reports mentioning the vessel.
+3. **Web search** — queries Linkup for news, sanctions, or IUU fishing reports mentioning the vessel.
 4. **Score** — computes a 0–100 rule-based risk score (`low` / `medium` / `high`) with plain-language reasons (e.g., gap duration >= 24h, fishing within 48h of a gap ending, flag changes, web hits).
 5. **Brief** — prompts an LLM (or falls back to a deterministic template) to write a cited Markdown brief strictly from the gathered facts.
 
@@ -64,7 +64,6 @@ A separate scheduled notebook (`notebooks/03_live_mpa_monitor.py`) supports roll
 ### APIs
 - **Global Fishing Watch API v3** (`https://gateway.api.globalfishingwatch.org/v3`) — MPA catalog, vessel events, and vessel identity lookup.
 - **Linkup Search API** (`https://api.linkup.so/v1/search`) — live web search with sourced answers (default).
-- **Tavily Search API** (`https://api.tavily.com/search`) — alternative live web search provider.
 - **Databricks SDK** (`databricks-sdk`) — queries Databricks Model Serving endpoints.
 
 ### Models
@@ -100,7 +99,7 @@ A separate scheduled notebook (`notebooks/03_live_mpa_monitor.py`) supports roll
 
 1. **Secrets** — never commit keys. Store them as Databricks secrets in the scope `hackathon`:
    - `gfw_token` — Global Fishing Watch API token
-   - `linkup_key` or `tavily_key` — web search key
+   - `linkup_key` — Linkup web search key
 
 2. **Outbound internet** — Databricks Free Edition blocks most outbound domains by default. Verify the workspace with LinkedIn to unlock it, then test:
    ```python

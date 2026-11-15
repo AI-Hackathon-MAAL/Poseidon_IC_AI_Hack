@@ -1,4 +1,4 @@
-"""Live web search with citations. Linkup is the default; Tavily is an alternative.
+"""Live web search with citations, powered by Linkup.
 
 Every result keeps its sources, so nothing the agent says about the web is uncited.
 """
@@ -7,7 +7,6 @@ from __future__ import annotations
 import requests
 
 LINKUP_URL = "https://api.linkup.so/v1/search"
-TAVILY_URL = "https://api.tavily.com/search"
 
 
 class SearchError(RuntimeError):
@@ -18,8 +17,8 @@ class SearchClient:
     def __init__(self, key, provider="linkup", session=None, timeout=60):
         if not key:
             raise ValueError("Missing web search key (Databricks secret hackathon/linkup_key)")
-        if provider not in ("linkup", "tavily"):
-            raise ValueError("provider must be 'linkup' or 'tavily'")
+        if provider != "linkup":
+            raise ValueError("provider must be 'linkup'")
         self.key, self.provider, self.timeout = key, provider, timeout
         self.session = session or requests.Session()
         self.calls = 0
@@ -28,10 +27,7 @@ class SearchClient:
         """Returns {answer, sources:[{title,url,snippet}], query, provider, from_date, to_date}."""
         self.calls += 1
         try:
-            if self.provider == "linkup":
-                answer, sources = self._linkup(query, from_date, to_date, max_results, depth)
-            else:
-                answer, sources = self._tavily(query, max_results)
+            answer, sources = self._linkup(query, from_date, to_date, max_results, depth)
         except requests.RequestException as e:
             raise SearchError(f"{self.provider} search failed: {e}") from e
         seen, clean = set(), []
@@ -58,13 +54,3 @@ class SearchClient:
         raw = d.get("sources") or d.get("results") or []
         return d.get("answer"), [{"title": s.get("name") or s.get("title"), "url": s.get("url"),
                                   "snippet": s.get("snippet") or s.get("content")} for s in raw if isinstance(s, dict)]
-
-    def _tavily(self, query, max_results):
-        r = self.session.post(TAVILY_URL, timeout=self.timeout,
-                              headers={"Authorization": f"Bearer {self.key}", "Content-Type": "application/json"},
-                              json={"query": query, "max_results": max_results, "include_answer": True})
-        if r.status_code >= 400:
-            raise SearchError(f"Tavily HTTP {r.status_code}: {r.text[:200]}")
-        d = r.json()
-        return d.get("answer"), [{"title": s.get("title"), "url": s.get("url"), "snippet": s.get("content")}
-                                 for s in d.get("results") or []]
