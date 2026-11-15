@@ -14,3 +14,13 @@ From the repository root:
 - **Static preview:** Run `python -m http.server 3102 --bind 127.0.0.1` and open [the globe](http://127.0.0.1:3102/app/). Keep `app/`, `public/` (shared styles and helpers) and `data/` as siblings. The historical archive is read-only on a static host.
 
 The globe loads the real [Poseidon snapshot](../data/poseidon_snapshot.json) first. If the file is missing, contains invalid JSON, or fails the snapshot contract, the globe loads the sample and displays **SYNTHETIC DATA**. A network, permissions or service error shows the publication as unavailable. The browser needs no GFW, Linkup or Databricks keys.
+
+### Investigate a queued vessel from the app
+
+Select a queued case and choose **Investigate now** in the connected Databricks App. Databricks accepts the request immediately and starts the agent when compute is available. The app shows progress and opens the report for the selected case once the agent publishes it. You can explore another ship and return while the job runs.
+
+1. Pull the team repository into the Databricks Git folder. Create an unscheduled serverless notebook job using the [job definition](../deploy/poseidon-investigate-case.job.json). Replace the notebook path with the workspace path to [app/investigate_case](./investigate_case.py). Set `export_volume` to the same volume used by `poseidon-exports`.
+2. The job's **Run as** identity needs read access to the code and `hackathon/gfw_token`, and read/write access to the export volume with its catalog and schema. Give it access to `hackathon/linkup_key` for web searches and a chat endpoint for model decisions. The task uses the same agent and fallback policy as the monitoring pipeline.
+3. In the Databricks App's **Resources**, add that job under the key `poseidon-investigate` with **Can manage run**. Enable the two `POSEIDON_JOB_ID` lines under `env` in [app.yaml](../app.yaml), then redeploy the app. The app itself needs only read access to the volume. [Databricks job resources](https://docs.databricks.com/gcp/en/dev-tools/databricks-apps/lakeflow)
+
+The task writes one report in the volume's `investigations/` directory. The app shows it alongside the fleet snapshot while the queued case matches the investigated observations. A newer fleet report takes precedence. The scheduled monitoring job continues to own the fleet export and Delta tables. A static or local preview without a connected job can display published reports.

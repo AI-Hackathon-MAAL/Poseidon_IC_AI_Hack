@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-investigation-api="">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -67,7 +67,13 @@
           <label class="point-picker investigation-picker" hidden><span>Investigation</span><select id="investigation-picker" aria-label="Choose protected-area investigation"></select></label>
         </div>
         <figure id="point-photo" class="vessel-photo" hidden></figure>
-        <div class="case-actions"><button id="clear-point" class="point-dismiss text-button" type="button" hidden>← Back to globe</button><button id="focus-area" type="button" class="secondary-button" disabled>Focus area <span aria-hidden="true">⌖</span></button><button id="investigate" class="primary-button" disabled><span id="investigate-label">Run investigation</span> <span aria-hidden="true">↗</span></button><button id="open-brief" type="button" class="text-button" disabled>Open saved brief</button></div>
+        <div class="case-actions">
+          <button id="clear-point" class="point-dismiss text-button" type="button" hidden>← Back to globe</button>
+          <button id="focus-area" type="button" class="secondary-button" disabled>Focus area <span aria-hidden="true">⌖</span></button>
+          <button id="investigate" type="button" class="primary-button" aria-describedby="investigation-status" disabled><span id="investigate-label">Investigate now</span> <span aria-hidden="true">↗</span></button>
+          <p id="investigation-status" class="investigation-status" role="status" hidden></p>
+          <button id="open-brief" type="button" class="text-button" disabled>Open saved brief</button>
+        </div>
       </section>
       <div class="map-caption"><span class="map-key"><i></i> Protected perimeter</span><span id="map-caption">Loading geographic context…</span><a id="boundary-source" target="_blank" rel="noopener noreferrer"></a></div>
     </section>

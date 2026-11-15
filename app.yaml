@@ -2,3 +2,6 @@ command: ["node", "server.mjs"]
 env:
   - name: POSEIDON_VOLUME
     valueFrom: poseidon-exports
+  # Enable after attaching the dedicated Job resource (see app/README.md).
+  # - name: POSEIDON_JOB_ID
+  #   valueFrom: poseidon-investigate

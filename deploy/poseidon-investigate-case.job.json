@@ -1,0 +1,21 @@
+{
+  "name": "Poseidon — investigate selected case",
+  "description": "Investigate the selected vessel and its published observations when an analyst requests a report.",
+  "max_concurrent_runs": 2,
+  "queue": {"enabled": true},
+  "timeout_seconds": 1800,
+  "parameters": [
+    {"name": "case_id", "default": ""},
+    {"name": "fingerprint", "default": ""}
+  ],
+  "tasks": [
+    {
+      "task_key": "investigate_case",
+      "notebook_task": {
+        "source": "WORKSPACE",
+        "notebook_path": "/Workspace/Users/<workspace-user>/Imperial-AI-Hackathon/app/investigate_case",
+        "base_parameters": {"export_volume": "/Volumes/workspace/poseidon/exports", "llm_endpoint": "auto"}
+      }
+    }
+  ]
+}

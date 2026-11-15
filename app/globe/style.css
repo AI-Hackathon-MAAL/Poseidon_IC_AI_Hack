@@ -641,6 +641,12 @@ dialog::backdrop { background: #070b0e78; backdrop-filter: blur(3px); }
 .case-actions .primary-button > span:last-child {
   flex-shrink: 0;
 }
+.case-actions .investigation-status {
+  margin: 0;
+  color: var(--muted);
+  font: 12px/1.5 var(--sans);
+  overflow-wrap: anywhere;
+}
 label.point-picker,
 label.investigation-picker {
   display: grid;

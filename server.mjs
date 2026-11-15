@@ -7,6 +7,8 @@ import { areas, map, replay, listItem, rankCases, investigate, validCatalog } fr
 import { loadCandidates, recordBrief, readBrief } from './providers.mjs';
 import { createSnapshotReader } from './snapshot.mjs';
 import { serveGlobe } from './app/host.mjs';
+import { createInvestigationJobs, validInvestigationKey } from './app/investigation-jobs.mjs';
+import { createResultReader } from './app/investigation-results.mjs';
 
 const root = fileURLToPath(new URL('./', import.meta.url));
 const assets = new Map([
@@ -50,8 +52,13 @@ async function save(dir, brief) {
   }
 }
 
-export function createApp({dataDir = resolve(root,'.soundings','briefs'), candidates = loadCandidates, store = recordBrief, readStored = readBrief, search, model, lookupHistory, readSnapshot = createSnapshotReader()} = {}) {
+export function createApp({dataDir = resolve(root,'.soundings','briefs'), candidates = loadCandidates, store = recordBrief, readStored = readBrief, search, model, lookupHistory, readSnapshot = createSnapshotReader(), jobs = createInvestigationJobs(), readResults = createResultReader()} = {}) {
   const pendingRuns = new Map();
+  async function currentPublication() {
+    const snapshot = await readSnapshot();
+    if (!jobs.enabled || snapshot.source !== 'export' || snapshot.data.synthetic || snapshot.data.data_source === 'sample') return snapshot;
+    return {...snapshot, data: await readResults(snapshot.data)};
+  }
   async function complete(record, records, origin) {
     const brief = await investigate(record,records,{search,model,lookupHistory,origin});
     const stored = await store(brief);
@@ -74,7 +81,7 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
       }
       if (req.method === 'GET' && (path === '/api/snapshot' || path === '/data/poseidon_snapshot.json')) {
         try {
-          const snapshot = await readSnapshot();
+          const snapshot = await currentPublication();
           res.setHeader('X-Poseidon-Source', snapshot.source);
           return json(res, 200, snapshot.data);
         } catch (error) {
@@ -86,7 +93,44 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
           return json(res, status, {error: 'The Poseidon export is unavailable. Check that the notebook published a snapshot and the app can read it.'});
         }
       }
-      if (req.method === 'GET' && await serveGlobe(path, res)) return;
+      if (path === '/api/investigations' || path.startsWith('/api/investigations/')) {
+        if (!jobs.enabled) return json(res,503,{error:'The Databricks investigation job is not connected to this app.'});
+        try {
+          if (req.method === 'POST' && path === '/api/investigations') {
+            const appOrigin = process.env.DATABRICKS_APP_URL
+              ? new URL(process.env.DATABRICKS_APP_URL).origin : 'http://' + req.headers.host;
+            if (req.headers['sec-fetch-site'] === 'cross-site' || (req.headers.origin && req.headers.origin !== appOrigin)) {
+              return json(res,403,{error:'Open Poseidon to request this investigation.'});
+            }
+            if (!/^application\/json(?:;|$)/i.test(req.headers['content-type'] || '')) return json(res,415,{error:'Send a JSON case ID.'});
+            let input;
+            try { input = await body(req); } catch { return json(res,400,{error:'Supply a case ID.'}); }
+            if (!validInvestigationKey(input?.caseId,input?.fingerprint) || (input.retryRunId != null && typeof input.retryRunId !== 'string')) {
+              return json(res,400,{error:'Select a published case with identifiable observations.'});
+            }
+            const snapshot = await currentPublication();
+            if (snapshot.source !== 'export') return json(res,409,{error:'Open a case from the current Databricks publication.'});
+            const publishedCase = snapshot.data.cases.find(row => row.case_id === input.caseId);
+            if (publishedCase && input.fingerprint !== publishedCase.fingerprint) {
+              return json(res,409,{error:'The case observations changed. Refresh the case before starting an investigation.'});
+            }
+            return json(res,202,await jobs.start(snapshot.data,input.caseId,input.retryRunId));
+          }
+          const run = path.match(/^\/api\/investigations\/(\d+)$/);
+          if (run && req.method === 'GET') {
+            const caseId = new URL(req.url,'http://localhost').searchParams.get('caseId');
+            if (!caseId) return json(res,400,{error:'Supply the case ID for this run.'});
+            return json(res,200,await jobs.status(caseId,run[1]));
+          }
+          return json(res,404,{error:'Unknown investigation resource.'});
+        } catch (error) {
+          if (Number.isInteger(error.status) && error.status >= 400 && error.status <= 599) {
+            return json(res,error.status,{error:error.message});
+          }
+          return json(res,503,{error:'The Databricks investigation service is unavailable. Try again shortly.'});
+        }
+      }
+      if (req.method === 'GET' && await serveGlobe(path, res, jobs.enabled)) return;
       if (req.method === 'GET' && assets.has(path)) {
         const [filename,type] = assets.get(path);
         const content = await readAsset(filename);

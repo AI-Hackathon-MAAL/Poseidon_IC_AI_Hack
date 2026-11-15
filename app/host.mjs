@@ -5,7 +5,7 @@ const repository = new URL('../', import.meta.url);
 
 // Only these public browser resources are available through the app host.
 const files = new Set([
-  'app/globe/workspace.mjs', 'app/globe/shell.js', 'app/globe/style.css',
+  'app/globe/workspace.mjs', 'app/globe/shell.js', 'app/globe/style.css', 'app/globe/investigation-control.mjs',
   'app/globe/area-explorer.mjs', 'app/globe/area-explorer.css',
   'app/globe/watch-summary.mjs', 'app/globe/watch-summary.css', 'app/globe/news-feed.mjs',
   'app/globe/agent-report.mjs', 'app/globe/report.css',
@@ -24,7 +24,7 @@ const types = {
   '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webp': 'image/webp',
 };
 
-export async function serveGlobe(path, res) {
+export async function serveGlobe(path, res, investigationsEnabled = false) {
   if (path === '/app') {
     res.writeHead(302, {Location: '/app/'}).end();
     return true;
@@ -37,7 +37,8 @@ export async function serveGlobe(path, res) {
     const template = await readFile(new URL('app/index.html', repository), 'utf8');
     // Qualify the app's local assets for its root alias. Fragment links still
     // target the current page and preserve the analyst's selection.
-    const page = template.replace('href="./globe/archive.html"', 'href="/archive"')
+    const page = template.replace('data-investigation-api=""', investigationsEnabled ? 'data-investigation-api="/api/investigations"' : 'data-investigation-api=""')
+      .replace('href="./globe/archive.html"', 'href="/archive"')
       .replaceAll('src="./', 'src="/app/').replaceAll('href="./', 'href="/app/');
     res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache'}).end(page);
     return true;

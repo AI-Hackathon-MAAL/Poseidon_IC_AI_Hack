@@ -5,6 +5,7 @@ import {appendRunContext} from './agent-context.mjs';
 import {renderVesselPhoto} from '../../public/vessel-photo.mjs';
 import {mountAreaExplorer} from './area-explorer.mjs';
 import {renderNewsFeed, renderWatchSummary} from './watch-summary.mjs';
+import {hasReport, mountInvestigationControl} from './investigation-control.mjs';
 
 const statusNames = {complete: 'Completed', queued: 'Awaiting investigation', incomplete: 'Incomplete'};
 const fishingAuthorization = {
@@ -16,7 +17,6 @@ const shortArea = name => (name || '').replace(/\s*[-–]\s*Reserva Marina$/i, '
 const samePoint = (a, b) => a && b && a.caseId === b.caseId && a.eventId === b.eventId &&
   a.role === b.role && a.lat === b.lat && a.lon === b.lon && a.markerTime === b.markerTime;
 const count = (n, singular, plural = singular + 's') => n + ' ' + (n === 1 ? singular : plural);
-const hasReport = record => record?.snapshotCase.status !== 'queued' && Boolean(record?.snapshotCase.brief_markdown?.trim());
 const positionLabel = (lat, lon) => [
   Math.abs(lat).toFixed(3) + (lat < 0 ? '°S' : '°N'),
   Math.abs(lon).toFixed(3) + (lon < 0 ? '°W' : '°E')
@@ -29,7 +29,7 @@ function measurement(value, unit) {
 }
 
 export function startWorkspace({$, make, date, safeLink, renderReport}) {
-  let catalog, revision, loading = false;
+  let catalog, revision, loading;
   let groups = [], anchors = [], areaEvents = [], datedPositions = [], vessel = null, selected = null, point = null;
   let groupIndex = new Map(), areaIndex = new Map();
   const dossier = document.querySelector('.case-dossier');
@@ -39,6 +39,11 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
   const refreshButton = $('refresh-export');
   const briefDialog = $('brief-dialog');
   const watchDialog = $('watch-dialog');
+  const updateInvestigation = mountInvestigationControl({button:$('investigate'), label:$('investigate-label'),
+    note:$('investigation-status'), openReport, refreshPublication:async caseId => {
+      const selectedAtRefresh = await refresh(false, true);
+      return {selectedAtRefresh, report:catalog?.cases.find(row => row.id === caseId)};
+    }});
   const areaTools = mountAreaExplorer({host:$('area-explorer'), searchHost:$('area-search-results'),
     onArea: id => goArea(id), onFilter: () => renderQueue(), onNews: id => openNews({scope:'area',areaId:id})});
   const shortDate = value => date(value).split(' · ')[0];
@@ -134,7 +139,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     datedPositions = [];
     $('observation-timeline').hidden = true;
     picker.parentElement.hidden = casePicker.parentElement.hidden = $('clear-point').hidden = true;
-    $('investigate').disabled = true;
+    updateInvestigation(null);
     renderVesselPhoto($('point-photo'), null);
     setActive();
     showMap(false, overview);
@@ -205,9 +210,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     casePicker.value = selected.id;
     $('clear-point').hidden = false;
     $('clear-point').textContent = '← Back to area';
-    $('investigate').disabled = !hasReport(selected);
-    $('investigate-label').textContent = hasReport(selected) ? 'View agent report' : raw.status === 'queued' ? statusNames.queued : 'Report unavailable';
-    $('investigate').lastElementChild.hidden = !hasReport(selected);
+    updateInvestigation(selected);
   }
   function selectVessel(key, preferredCase) {
     const next = groupIndex.get(key);
@@ -420,16 +423,22 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     for (const r of records) for (const p of r.mapPoints) if (p.markerTime && (!latest || Date.parse(p.markerTime) > Date.parse(latest))) latest = p.markerTime;
     return latest;
   }
-  async function refresh(manual = false) {
-    if (loading || (!manual && (document.hidden || document.querySelector('dialog[open]')))) return;
-    loading = true;
+  function refresh(manual = false, requestedReport = false) {
+    if (loading) return loading;
+    if (!manual && !requestedReport && (document.hidden || document.querySelector('dialog[open]'))) return Promise.resolve();
+    loading = readPublication(manual).finally(() => { loading = null; refreshButton.disabled = false; });
+    return loading;
+  }
+  async function readPublication(manual) {
     refreshButton.disabled = true;
     try {
       const {data, source} = await loadWorkspaceSnapshot(fetch, {signal: AbortSignal.timeout(40000)});
       const nextRevision = source + ':' + exportRevision(data);
       const changed = revision !== nextRevision;
+      const selectedAtRefresh = selected?.id;
       if (changed) { install(snapshotCatalog(data, source)); revision = nextRevision; }
       message(manual ? changed ? 'New publication loaded.' : 'Latest publication is displayed.' : '');
+      return selectedAtRefresh;
     } catch {
       if (catalog) message('Refresh unavailable. Showing the last loaded publication.');
       else {
@@ -438,7 +447,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
         $('case-meta').textContent = 'Refresh to check for published results.';
         $('cases').replaceChildren(make('p','The published results could not be loaded.', 'queue-empty'));
       }
-    } finally { loading = false; refreshButton.disabled = false; }
+    }
   }
   $('area').addEventListener('change', () => goArea($('area').value));
   function showWatchPanel(title) {
@@ -489,13 +498,13 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     }
     $('map').querySelector('.mar-stage')?.focus({preventScroll:true});
   });
-  $('investigate').addEventListener('click', () => {
-    if (!selected?.snapshotCase.brief_markdown || selected.snapshotCase.status === 'queued') return;
-    renderReport(selected, catalog);
-    renderVesselPhoto($('report-photo'), selected);
+  function openReport(record) {
+    if (!hasReport(record)) return;
+    renderReport(record, catalog);
+    renderVesselPhoto($('report-photo'), record);
     briefDialog.showModal();
     briefDialog.scrollTop = 0;
-  });
+  }
   $('view-export').addEventListener('click', showDataset);
   $('close-export').addEventListener('click', () => $('export-dialog').close());
   refreshButton.addEventListener('click', () => refresh(true));
