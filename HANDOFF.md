@@ -9,7 +9,6 @@ Read this first, then `AGENTS.md`, `docs/backend.md` and `docs/ui-spec.md`.
 - **Bounties targeted:** Databricks (main; scored on creativity, technical depth, real-world impact), Linkup (agent that researches and verifies fresh information with cited sources).
 - **Team:** Kingston (backend lead, owns this session), aarin (owns the GitHub org; wrote the earlier live monitor `notebooks/03_live_mpa_monitor.py`), Louis (front end, using ChatGPT Codex, building in `app/`).
 - **Repo:** `AI-Hackathon-MAAL/Imperial-AI-Hackathon` (private), branch `main`. Earlier lived at `aarinr/Imperial-AI-Hackathon`.
-- **Databricks:** Free Edition workspace `https://dbc-e6a70d48-0742.cloud.databricks.com`. Outbound internet works (GFW and Linkup reachable). Serverless only; one Databricks App allowed (stops after 24 h).
 
 ## 2. The product
 
