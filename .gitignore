@@ -25,3 +25,6 @@ node_modules/
 .soundings/
 !.env.example
 *.log
+
+# Python app: investigations saved locally
+python-app/data/

@@ -1,0 +1,125 @@
+.mar-view {position:relative;isolation:isolate;overflow:hidden;width:100%;height:100%;min-height:310px;color:#d9e5e9;background:radial-gradient(ellipse at 50% 54%,#101f2b 0%,#08131d 67%,#071019 100%);font-family:"Inter","Segoe UI",sans-serif}
+.mar-stage,.mar-raster,.mar-overlay {position:absolute;inset:0;width:100%;height:100%;display:block}
+.mar-stage {touch-action:none;cursor:grab;outline:none}
+.mar-stage:focus-visible {box-shadow:inset 0 0 0 2px #8ee5e0;z-index:1}
+.mar-stage.mar-dragging {cursor:grabbing}
+.mar-raster,.mar-overlay {pointer-events:none}
+.mar-modes,.mar-tools {position:absolute;z-index:2;display:flex;background:#101e28eb;border:1px solid #45606c;border-radius:5px;padding:3px;gap:1px;box-shadow:0 2px 12px #00121b50}
+.mar-modes {left:13px;top:13px}
+.mar-tools {right:13px;top:13px;flex-direction:column;gap:0}
+.mar-view button.mar-button {display:grid;place-items:center;appearance:none;min-height:27px;margin:0;padding:4px 10px;border:0;border-radius:3px;background:transparent;box-shadow:none;color:#b7cbd1;font:600 10px/1 "Inter","Segoe UI",sans-serif;letter-spacing:.02em;cursor:pointer;text-transform:none;transition:background-color 120ms}
+.mar-view button.mar-button[aria-pressed=true] {background:#334a55;color:#f3fbfd}
+.mar-view button.mar-button:hover,.mar-view button.mar-button:focus-visible {background:#2b414c;color:#fff;outline:1px solid #7fd8d6;outline-offset:-1px}
+.mar-tools button.mar-button {width:27px;padding:1px;font:400 19px/1 "Segoe UI",sans-serif}
+.mar-view button.mar-locator {position:absolute;z-index:2;right:15px;bottom:36px;width:72px;height:72px;min-height:0;padding:0;background:radial-gradient(circle,#182c38 15%,#091722 73%);border:1px solid #597681;border-radius:50%;box-shadow:0 1px 12px #04101980;overflow:hidden}
+.mar-view button.mar-locator:hover,.mar-view button.mar-locator:focus-visible {border-color:#98ede0;background:#112734}
+.mar-view button.mar-locator[hidden] {display:none}
+.mar-locator-raster {position:absolute;inset:0;width:100%;height:100%}
+.mar-readout {position:absolute;z-index:1;bottom:10px;left:13px;display:flex;gap:13px;align-items:flex-end;pointer-events:none;color:#bfd4da;font:9px/1.2 "IBM Plex Mono",Consolas,monospace;text-shadow:0 1px 3px #07111a}
+.mar-scale {min-width:20px;display:grid;place-items:center;padding:0 0 3px;border:1px solid #a3b8c2;border-top:0;white-space:nowrap;line-height:9px}
+.mar-location {letter-spacing:.02em}
+.mar-view a.mar-attribution {position:absolute;z-index:2;bottom:8px;right:10px;padding:3px 5px;border-radius:2px;color:#b6c8cd;background:#0a1923cf;text-decoration:none;font:9px/1.2 "Inter","Segoe UI",sans-serif}
+.mar-view a.mar-attribution:focus-visible,.mar-view a.mar-attribution:hover {color:white;text-decoration:underline}
+.mar-texture-state:not(:empty){position:absolute;bottom:38px;left:12px;padding:4px 7px;background:#162731;color:#e0c598;font:11px/1.4 sans-serif}
+.mar-sr {position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
+@media(max-width:540px){.mar-view{min-height:280px}.mar-location{display:none}.mar-tools button.mar-button{width:32px;min-height:32px}.mar-modes .mar-button{min-height:31px}}
+@media(prefers-reduced-motion:reduce){.mar-view button.mar-button{transition:none}}
+.mar-view {
+  --map-ink:#d6ddd7; --map-button:#141b1e; --map-border:#424b49;
+  background:radial-gradient(ellipse at 66% 43%,#151d20 0%,#11171a 39%,#0c1012 72%,#0a0d0f 100%);
+}
+.mar-view[data-mode=globe] .mar-stage::before {
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.28;
+  background-image:radial-gradient(circle, #65736c .6px, transparent .8px);
+  background-size:44px 44px;
+}
+.mar-modes,.mar-tools {border:1px solid var(--map-border);background:var(--map-button);border-radius:3px;box-shadow:0 2px 8px #080b0d55}
+.mar-modes {top:24px;right:24px;left:auto}
+.mar-tools {right:24px;top:83px}
+.mar-view button.mar-button {font-size:11px;padding:6px 11px;border-radius:1px;color:#bac4c0}
+.mar-view button.mar-button[aria-pressed=true] {color:#e8eeeb;background:#37413d}
+.mar-view button.mar-button:focus-visible,.mar-view button.mar-button:hover {outline-color:#a6bcb2;color:#fff;background:#2c3632}
+.mar-tools button.mar-button {width:31px;min-height:30px;padding:1px;font:400 20px/1 "Segoe UI",sans-serif}
+.mar-view button.mar-callout {
+  display:block;position:absolute;z-index:1;min-width:125px;min-height:0;padding:7px 11px 7px 10px;
+  border:1px solid #686d5b;border-left:2px solid #ded6a6;
+  border-radius:2px;color:#ebeee4;text-align:left;
+  background:linear-gradient(115deg,#242b25f5,#182022f5);box-shadow:0 4px 14px #060a0b45;
+}
+.mar-view button.mar-callout:hover,.mar-view button.mar-callout:focus-visible {background:#343e33;outline-color:#d5d5b2}
+.mar-view button.mar-callout[hidden] {display:none}
+.mar-callout-type {display:block;color:#b6b89f;font:8px/1.2 "IBM Plex Mono",Consolas,monospace;letter-spacing:.13em;text-transform:uppercase}
+.mar-callout-name {display:block;margin-top:3px;color:#f2f1df;font:600 13px/1.2 "Inter","Segoe UI",sans-serif;letter-spacing:.002em}
+.mar-stage:focus-visible {box-shadow:inset 0 0 0 2px #b4c5b8}
+.mar-observations {position:absolute;inset:0;pointer-events:none}
+.mar-marker {
+  --marker:#93a5aa;
+  position:absolute;display:grid;place-items:center;pointer-events:auto;touch-action:none;
+  width:32px;height:32px;min-height:0;margin:0;padding:0;transform:translate(-50%,-50%);
+  color:#dcfff7;background:transparent;border:none;border-radius:50%;cursor:pointer;
+  font:600 10px/1 Consolas,monospace;font-variant-numeric:tabular-nums;
+}
+.mar-marker[data-role="gap-start"]:not([data-vessel-risk]) {--marker:#edbb7c}
+.mar-marker[data-role="gap-end"]:not([data-vessel-risk]) {--marker:#a4ddda}
+.mar-marker::before {
+  content:"";display:block;width:7px;height:7px;border-radius:50%;
+  background:var(--marker);border:1px solid #11292c;
+  box-shadow:0 0 0 2px #0b222ac9,0 0 0 3px color-mix(in srgb, var(--marker) 55%, transparent);
+}
+.mar-marker[data-glyph="observation"][data-cluster="true"] {
+  width:32px;height:32px;background:#173b3b;border:1px solid #8dcdc0;
+  box-shadow:0 0 0 3px #82cfbb26,0 2px 6px #0009;
+}
+.mar-marker[data-glyph="observation"][data-cluster="true"]::before {display:none}
+.mar-marker[data-glyph="history"][data-cluster="true"]::after {
+  content:"";position:absolute;width:4px;height:4px;transform:translate(6px,-6px);
+  border:1px solid #11292c;border-radius:50%;background:var(--marker);pointer-events:none;
+}
+.mar-marker:is(:hover,:focus-visible),.mar-marker[data-focused="true"] {
+  z-index:1;outline:2px solid #f1d29b;outline-offset:2px;
+}
+.mar-marker:focus:not(:focus-visible) {outline:none}
+.mar-marker:is([data-glyph="ship"],[data-glyph="contacts"],[data-glyph="gear"]) {
+  --marker:#93a5aa;background:#161e22;border:1px solid #63757a;border-radius:7px;
+  box-shadow:0 1px 5px #0009; color:var(--marker);
+}
+.mar-marker[data-glyph="gear"] {--marker:#e3bd85;border-color:#8d785b}
+.mar-marker:is([data-glyph="ship"],[data-glyph="contacts"],[data-glyph="gear"])::before {
+  content:"";display:block;width:18px;height:17px;background:var(--marker);border:0;border-radius:0;box-shadow:none;
+  clip-path:polygon(2% 52%,24% 52%,24% 35%,40% 35%,40% 20%,63% 20%,63% 35%,77% 35%,77% 52%,100% 52%,80% 78%,21% 78%);
+}
+.mar-marker[data-glyph="gear"]::before {
+  clip-path:polygon(43% 6%,57% 6%,57% 36%,66% 39%,71% 66%,86% 71%,86% 81%,69% 87%,31% 87%,14% 81%,14% 71%,29% 66%,34% 39%,43% 36%);
+}
+.mar-marker:is([data-glyph="ship"],[data-glyph="gear"],[data-glyph="contacts"])[data-cluster="true"]::after {
+  content:"+";position:absolute;top:-5px;right:-6px;display:grid;place-items:center;width:14px;height:14px;
+  background:#c9e3d7;color:#203b35;border:1px solid #1b3635;border-radius:50%;font:700 11px/1 Consolas,monospace;
+}
+.mar-marker[data-glyph="contacts"] {border-color:#b3a57f}
+.mar-picker {
+  position:absolute;z-index:5;width:min(245px,calc(100% - 24px));padding:10px;
+  background:#172327;color:#e5eee9;border:1px solid #608078;border-radius:6px;
+  box-shadow:0 10px 32px #061314bb;font:13px/1.4 Inter,"Segoe UI",sans-serif;
+}
+.mar-picker[hidden] {display:none}
+.mar-picker-head,.mar-picker-item {display:flex;justify-content:space-between;gap:10px;align-items:center}
+.mar-picker-head {margin-bottom:6px}
+.mar-picker-search {width:100%;margin:0 0 5px;padding:6px 8px;background:#101a1c;color:#e5eee9;border:1px solid #587168}
+.mar-picker-list {max-height:min(200px,38vh);overflow:auto;overscroll-behavior:contain}
+.mar-picker-item {width:100%;min-height:34px;padding:5px 7px;background:none;border:0;border-top:1px solid #394a47;
+  border-radius:0;color:#dfede6;text-align:left;font:inherit;cursor:pointer}
+.mar-picker-item small {color:#9eafa9;font-size:10px}
+.mar-history-item {align-items:flex-start;flex-direction:column;gap:1px}
+.mar-marker[data-glyph="observation"][data-cluster="true"] {width:23px;height:23px;font-size:9px}
+.mar-picker-item:is(:hover,:focus-visible) {background:#2e413c;color:#fff}
+.mar-picker-empty {color:#bbc7c2;font-size:12px}
+.mar-readout {left:40px;bottom:12px}
+.mar-view a.mar-attribution {bottom:9px;right:24px;color:#99a8a5;background:#10171b95}
+.mar-view button.mar-locator {right:24px;bottom:49%;width:66px;height:66px;border-radius:50%;padding:0}
+@media(max-width:759px) {
+  .mar-modes {right:14px;top:14px}
+  .mar-tools {right:14px;top:72px}
+  .mar-readout {left:16px;bottom:10px}
+  .mar-view button.mar-locator {bottom:43px;right:14px}
+  .mar-view button.mar-callout {min-width:114px;padding:6px 8px}
+}
