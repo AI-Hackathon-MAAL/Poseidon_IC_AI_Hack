@@ -7,7 +7,8 @@ const repository = new URL('../', import.meta.url);
 const files = new Set([
   'app/globe/workspace.mjs', 'app/globe/shell.js', 'app/globe/style.css',
   'app/globe/area-explorer.mjs', 'app/globe/area-explorer.css',
-  'app/globe/watch-summary.mjs', 'app/globe/watch-summary.css',
+  'app/globe/watch-summary.mjs', 'app/globe/watch-summary.css', 'app/globe/news-feed.mjs',
+  'app/globe/agent-report.mjs', 'app/globe/report.css',
   'app/globe/geo-layers.js', 'app/globe/geo-layers.css', 'app/globe/detail-relief.js',
   'app/globe/maritime-map.js', 'app/globe/snapshot-loader.mjs', 'app/globe/agent-context.mjs',
   'app/assets/poseidon.svg', 'app/assets/fonts/inter-latin.woff2',

@@ -15,6 +15,13 @@
 .geo-news.country-level path {fill:#a0c4c8;fill-opacity:.75;}
 .geo-news.multiple path {stroke:#ccf4ef;stroke-width:1.8;}
 .geo-news:hover path,.geo-news:focus-visible path {stroke:white;stroke-width:2.5;}
+.mar-view button.mar-news-toggle {display:flex;align-items:center;gap:6px;}
+.mar-view button.mar-news-toggle[hidden] {display:none;}
+.mar-news-toggle::before {content:"";width:6px;height:6px;border:1px solid #a0c4c8;transform:rotate(45deg);}
+.mar-news-toggle[aria-pressed="true"]::before {background:#a0c4c8;}
+@media (max-width: 480px) {
+  .mar-view .mar-modes {left:14px;right:auto;top:auto;bottom:64px;}
+}
 .geo-boundary-credit {position:absolute;z-index:2;bottom:26px;right:24px;max-width:38%;color:#b8c5bf;background:#142024d9;
   font:9px/1.25 Inter,"Segoe UI",sans-serif;text-align:right;padding:2px 4px;pointer-events:none;}
 .geo-boundary-credit:empty {display:none;}

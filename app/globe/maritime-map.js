@@ -79,15 +79,18 @@
     const span = Math.max(REGIONAL_SPAN, degrees*Math.cos(lat*DEG)*1.65, (north-south)*aspect*1.6);
     return {lon:wrap(west+degrees/2),lat,span:Math.min(span,155)};
   }
+  function globeRadius(w,h) {
+    return w>=760 ? Math.min(w*.35,h*.435) : Math.min(w*.49,h*.32);
+  }
+  function regionWidth(w) {return w>=760 ? Math.max(w*.54,w-500) : w*.95;}
+  function areaScale(span) {return .5/Math.sin(clamp(span/2,.45,79)*DEG);}
   function camera(view,w,h,mini=false) {
     const globe = view.mode === 'globe';
     const tilt = view.tilt ?? (globe ? 0 : Math.min(24, Math.max(0, 80 - Math.abs(view.lat))));
     const origin = clamp(view.lat - tilt, -89.95,89.95)*DEG;
     const desktop = w>=760 && !mini;
-    const regionWidth = desktop ? Math.max(w*.54,w-500) : w*.95;
-    const radius = view.radius ?? (globe ? (mini ? w*.435 :
-      desktop ? Math.min(w*.35,h*.435) : Math.min(w*.49,h*.32))*view.mag :
-      regionWidth/(2*Math.sin(clamp(view.span/2,.45,79)*DEG)));
+    const radius = view.radius ?? (globe ? (mini ? w*.435 : globeRadius(w,h))*view.mag :
+      regionWidth(w)*(view.areaScale ?? areaScale(view.span)));
     const sin = Math.sin(origin), cos = Math.cos(origin);
     const cx = w*(mini?.5:desktop?.655:.5);
     const cy = h*(mini?.505:desktop?.435:.58) + radius*Math.sin(tilt*DEG);
@@ -275,7 +278,7 @@
     regionCallout.append(calloutType,calloutName);
     const locator=button('Open globe at this map location','',()=>{
       if(data.vesselMode){openGlobe();return;}
-      view={...view,mode:'globe',mag:1};dirty();
+      stopMotion();view={...view,mode:'globe',mag:1};dirty();
     });
     locator.classList.add('mar-locator');
     const locatorCanvas=el('canvas','mar-locator-raster');
@@ -291,6 +294,7 @@
     let data={points:[],contextPoints:[]}, view={mode:'globe',lon:-108,lat:20,span:25,mag:1};
     let frame=0,drag=null,width=1,height=1,world=null,pacific=null,signature='';
     let focusedCase=false,ignorePointerClick=false,flight=null,lastCamera=null,rasterKey='',pickerOwner=null;
+    let zoomMotion=null,terrainCamera=null;
     const detailRelief=window.PoseidonDetailRelief?.create(()=>{rasterKey='';dirty();});
     const reduceMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
     const markerButtons=[];
@@ -369,7 +373,7 @@
     chooser.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeChooser(true);}});
     root.addEventListener('focusout',e=>{if(!chooser.hidden && e.relatedTarget && !chooser.contains(e.relatedTarget))closeChooser();});
     function reset(mode='area', focusCase=false, animate=false, fitHistory=false, fitAll=false) {
-      closeChooser();
+      closeChooser();zoomMotion=null;
       focusedCase=focusCase;
       const overview=!focusCase && data.contextPoints.length>0;
       const point=focusCase && !fitHistory && validLocation(data.focusPoint) ? data.focusPoint : null;
@@ -406,35 +410,87 @@
         data.onOverview();
       }else reset('globe',false,true);
     }
-    function zoom(direction) {
-      closeChooser();flight=null;
-      if(view.mode==='globe'){
-        view.mag=clamp(view.mag*Math.pow(1.35,direction),.65,4);
-        if(direction>0 && view.mag>2.35 && !data.activeRegionId && data.onSelectRegion){
-          const cam=camera(view,width,height),focus=cam.project(view.lon,view.lat);
-          let nearest=null,distance=Math.min(width,height)*.14;
-          for(const region of data.regions||[]){
-            const anchor=geo.center(region)||geo.regionBounds(region);
-            if(!anchor)continue;
-            const pos=cam.project(anchor.lon,anchor.lat),d=Math.hypot(pos.x-focus.x,pos.y-focus.y);
-            if(pos.z>0 && d<distance){nearest=region;distance=d;}
-          }
-          if(nearest){data.onSelectRegion(String(nearest.mpa_id));return;}
-        }
-      }else view.span=clamp(view.span*Math.pow(.72,direction),1.3,150);
+    function currentScale(){
+      return view.mode==='globe' ? view.mag : view.areaScale ?? areaScale(view.span);
+    }
+    function setScale(value){
+      if(view.mode==='globe')view.mag=value;
+      else {
+        view.areaScale=value;
+        view.span=2*Math.asin(Math.min(1,.5/value))/DEG;
+      }
+    }
+    function stopMotion(){
+      zoomMotion=null;
+      if(flight && lastCamera){
+        // Take control of the last frame the analyst actually saw, even halfway through a flight.
+        view.lon=lastCamera.lon;view.lat=lastCamera.lat;view.tilt=lastCamera.tilt;
+        setScale(lastCamera.radius/(view.mode==='globe'?globeRadius(width,height):regionWidth(width)));
+      }
+      flight=null;
+    }
+    function zoom(steps,keepDestination=false) {
+      if(!steps)return;
+      if(flight && !keepDestination)stopMotion();
+      closeChooser();
+      const scale=currentScale(),direction=Math.sign(steps);
+      const base=zoomMotion?.direction===direction ? zoomMotion.target : scale;
+      const low=view.mode==='globe'?.65:areaScale(150),high=view.mode==='globe'?4:areaScale(1.3);
+      const target=clamp(base*Math.pow(1.35,steps),Math.min(low,scale),Math.max(high,scale));
+      if(target===scale){zoomMotion=null;dirty();return;}
+      if(flight){
+        // A zoom button applies to the selected destination, including during an area fly-to.
+        const now=performance.now(),left=Math.max(180,flight.duration-(now-flight.start));
+        setScale(target);flight={from:lastCamera,start:now,duration:left};dirty();return;
+      }
+      zoomMotion={target,direction,time:zoomMotion?.time ?? performance.now()};
       dirty();
+    }
+    function advanceZoom(now){
+      if(!zoomMotion)return false;
+      const {target,direction,time}=zoomMotion,scale=currentScale();
+      const remaining=Math.log(target/scale),elapsed=Math.max(0,now-time);
+      if(reduceMotion?.matches || Math.abs(remaining)<.0005){setScale(target);zoomMotion=null;}
+      else {
+        setScale(scale*Math.exp(remaining*(-Math.expm1(-elapsed/65))));
+        zoomMotion.time=now;dirty();
+      }
+      return direction>0;
+    }
+    function nearbyRegion(cam){
+      const focus=cam.project(view.lon,view.lat);
+      let nearest=null,distance=Math.min(width,height)*.14;
+      for(const region of data.regions||[]){
+        const anchor=geo.center(region)||geo.regionBounds(region);
+        if(!anchor)continue;
+        const pos=cam.project(anchor.lon,anchor.lat),d=Math.hypot(pos.x-focus.x,pos.y-focus.y);
+        if(pos.z>0 && d<distance){nearest=region;distance=d;}
+      }
+      return nearest;
     }
     const areaBtn=button('Fit map to the selected area','Area',()=>reset('area',data.historyMode,true,data.historyMode,true));
     const globeBtn=button('Show the 3D globe','Globe',openGlobe);
-    modes.append(globeBtn,areaBtn);
-    tools.append(button('Zoom in','+',()=>zoom(1)),button('Zoom out','−',()=>zoom(-1)),button('Reset map view','⌖',()=>data.vesselMode?openGlobe():reset(view.mode)));
+    let showNewsMarkers=true;
+    const noArticles=[];
+    const newsBtn=button('Show news markers','News markers',()=>{
+      showNewsMarkers=!showNewsMarkers;
+      newsBtn.setAttribute('aria-pressed',String(showNewsMarkers));
+      closeChooser();
+      layers.setData(data.regions,showNewsMarkers?data.globalNews:noArticles);
+      dirty();
+    });
+    newsBtn.classList.add('mar-news-toggle');
+    newsBtn.setAttribute('aria-pressed','true');
+    modes.append(globeBtn,areaBtn,newsBtn);
+    tools.append(button('Zoom in','+',()=>zoom(1,true)),button('Zoom out','−',()=>zoom(-1,true)),button('Reset map view','⌖',()=>data.vesselMode?openGlobe():reset(view.mode)));
     function dirty(){if(!frame)frame=requestAnimationFrame(paint);}
-    function paint() {
+    function paint(now) {
       frame=0;
       if(width<2||height<2)return;
+      const zoomingIn=advanceZoom(now);
       let cam=camera(view,width,height);
       if(flight){
-        const progress=clamp((performance.now()-flight.start)/flight.duration,0,1);
+        const progress=clamp((now-flight.start)/flight.duration,0,1);
         const t=progress*progress*(3-2*progress),from=flight.from;
         if(progress<1){
           cam=camera({...view,lon:wrap(from.lon+wrap(view.lon-from.lon)*t),
@@ -445,10 +501,30 @@
       }
       lastCamera=cam;
       root.dataset.mode=view.mode;
-      const moving=Boolean(drag||flight);
+      const moving=Boolean(drag||flight||zoomMotion);
       detailRelief?.update(cam,moving);
       const key=[width,height,cam.lon,cam.lat,cam.tilt,cam.radius,moving,Boolean(world),Boolean(pacific)].join('|');
-      if(key!==rasterKey){screenTexture(terrain,cam,world,pacific,moving,detailRelief);rasterKey=key;}
+      if(zoomMotion){
+        // With the same orientation, orthographic zoom is an exact screen-space scale.
+        // Reuse projected relief between redraws, keeping overlays and hit targets at full resolution.
+        const compatible=terrainCamera && cam.lon===terrainCamera.lon && cam.lat===terrainCamera.lat &&
+          cam.tilt===terrainCamera.tilt && cam.w===terrainCamera.w && cam.h===terrainCamera.h;
+        const ratio=compatible ? cam.radius/terrainCamera.radius : 0;
+        if(!rasterKey || ratio<1 || ratio>1.5){
+          const endRadius=cam.radius*zoomMotion.target/currentScale();
+          const radius=Math.max(cam.radius*.8,Math.min(cam.radius,endRadius));
+          terrainCamera=camera({...view,radius},width,height);
+          screenTexture(terrain,terrainCamera,world,pacific,true,detailRelief);
+          rasterKey='zoom';
+        }
+        const originY=cam.cy-cam.radius*Math.sin(cam.tilt*DEG);
+        terrain.style.transformOrigin=cam.cx+'px '+originY+'px';
+        terrain.style.transform='scale('+cam.radius/terrainCamera.radius+')';
+      }else if(key!==rasterKey || terrain.style.transform){
+        terrain.style.transform='';
+        screenTexture(terrain,cam,world,pacific,moving,detailRelief);
+        terrainCamera=cam;rasterKey=key;
+      }
       const dpr=Math.min(devicePixelRatio||1,2);
       const cw=Math.round(width*dpr),ch=Math.round(height*dpr);
       if(overlay.width!==cw||overlay.height!==ch){overlay.width=cw;overlay.height=ch;}
@@ -488,6 +564,10 @@
       scale.style.width=(nice/kmPerPx)+'px';
       scale.textContent=nice>=1?nice+' km':Math.round(nice*1000)+' m';
       location.textContent=coord(view.lat,true)+'  '+coord(view.lon);
+      if(zoomingIn && view.mode==='globe' && view.mag>2.35 && !data.activeRegionId && data.onSelectRegion){
+        const nearest=nearbyRegion(cam);
+        if(nearest)data.onSelectRegion(String(nearest.mpa_id));
+      }
     }
     function drawContext(ctx,cam) {
       if(!data.vesselMode && !data.onSelectCase && data.contextPoints.length){
@@ -650,8 +730,9 @@
       const activeRegionId=String(next.activeRegionId??'');
       const regions=next.regions||[];
       const activeRegion=regions.find(region=>String(region.mpa_id)===activeRegionId);
-      layers.setData(next.regions,next.globalNews);
+      layers.setData(next.regions,showNewsMarkers?next.globalNews:noArticles);
       const historyMode=Boolean(next.vesselMode && !next.overview && (next.activeVesselKey||next.caseId||next.historyPoints?.length||next.focusPoint));
+      newsBtn.hidden=Boolean(activeRegionId || historyMode || !next.globalNews?.some(article=>article?.place_type!=='none' && validLocation(article)));
       const vesselAnchor=historyMode ? (next.vesselAnchor || contextPoints.find(p=>p.vesselKey===(next.activeVesselKey||next.caseId))) : null;
       let markerPoints=next.vesselMode ? (historyMode ? (next.historyPoints||points).filter(validLocation) :
         contextPoints.filter(p=>p.vesselKey!=null)) : (typeof next.onSelectCase==='function' ? contextPoints.filter(p=>p.caseId!=null) : []);
@@ -702,7 +783,7 @@
     }
     stage.addEventListener('pointerdown',e=>{
       if(e.button!==0||drag)return;
-      closeChooser();flight=null;
+      closeChooser();stopMotion();
       ignorePointerClick=false;
       if(!e.target.closest('.mar-marker, .mar-geography [role=button]'))stage.focus({preventScroll:true});
       drag={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};
@@ -728,22 +809,23 @@
     stage.addEventListener('pointerup',release);stage.addEventListener('pointercancel',release);stage.addEventListener('lostpointercapture',release);
     stage.addEventListener('keydown',e=>{
       if(e.target!==stage && !e.key.startsWith('Arrow'))return;
-      if(flight)flight=null;
+      if(e.key.startsWith('Arrow'))stopMotion();
       const movement=view.mode==='globe'?10/view.mag:view.span/12;
       if(e.key==='ArrowLeft')view.lon=wrap(view.lon-movement);
       else if(e.key==='ArrowRight')view.lon=wrap(view.lon+movement);
       else if(e.key==='ArrowUp')view.lat=clamp(view.lat+movement,-86,86);
       else if(e.key==='ArrowDown')view.lat=clamp(view.lat-movement,-86,86);
-      else if(e.key==='+'||e.key==='=')zoom(1);
-      else if(e.key==='-')zoom(-1);
+      else if(e.key==='+'||e.key==='=')zoom(1,true);
+      else if(e.key==='-')zoom(-1,true);
       else if(e.key==='Home'){if(data.vesselMode)openGlobe();else reset(view.mode);}
       else return;
       e.preventDefault();dirty();
     });
     stage.addEventListener('wheel',e=>{
-      if(document.activeElement!==stage || !e.deltaY || e.ctrlKey)return;
+      if(!e.deltaY)return;
       const unit=e.deltaMode===1?16:e.deltaMode===2?height:1;
-      const steps=clamp(-e.deltaY*unit/120,-1,1);
+      // Browsers expose precision-trackpad pinches as small control-wheel deltas.
+      const steps=clamp(-e.deltaY*unit/(e.ctrlKey ? 32 : 160),-1.5,1.5);
       e.preventDefault();zoom(steps);
     },{passive:false});
     new ResizeObserver(resize).observe(root);resize();

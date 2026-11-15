@@ -61,7 +61,7 @@ function appendSourceLinks(container, sources) {
   }
 }
 
-function addWatchDetails(container, area) {
+function addWatchDetails(container, area, onNews) {
   const metrics = el('dl', null, 'area-metrics');
   for (const [key, label] of [
     ['n_cases','Cases'], ['n_events','Events'], ['n_gap','Tracking gaps'],
@@ -96,6 +96,10 @@ function addWatchDetails(container, area) {
   const context = disclosure('Regional context');
   context.append(el('p',area.news_summary || 'This publication includes no regional summary.'));
   appendSourceLinks(context,area.news_sources);
+  const news = el('button','Browse news for this area →','area-news-link');
+  news.type = 'button';
+  news.addEventListener('click', () => onNews(String(area.mpa_id)));
+  context.append(news);
   container.append(rules,context);
 }
 
@@ -106,7 +110,7 @@ function loadedWindows(snapshot, id) {
   return [...new Set(sources.map(row => row.window_start.slice(0,10) + ' – ' + row.window_end.slice(0,10)))].sort();
 }
 
-export function mountAreaExplorer({host, searchHost, onArea, onFilter}) {
+export function mountAreaExplorer({host, searchHost, onArea, onFilter, onNews}) {
   const input = document.getElementById('case-search');
   let snapshot, areaId = '', filters = defaults(), directory, loading;
   let watched = new Map();
@@ -127,7 +131,7 @@ export function mountAreaExplorer({host, searchHost, onArea, onFilter}) {
     overview.classList.add('area-overview');
     const scroll = el('div',null,'area-scroll');
     scroll.append(el('h3',area.mpa_name || areaId));
-    addWatchDetails(scroll,area);
+    addWatchDetails(scroll,area,onNews);
     const query = el('div',null,'area-controls');
     query.append(labelledSelect('Event', [['','All events'], ...events], filters.eventType, value => setFilter('eventType',value)));
     const riskLabel = el('label','Minimum risk');

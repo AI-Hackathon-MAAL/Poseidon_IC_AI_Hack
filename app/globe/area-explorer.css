@@ -71,6 +71,7 @@
 .area-note code, .area-unwatched code { margin-right: 6px; color: var(--ink); font: 10px var(--mono); }
 .area-note code { display: inline-block; margin-left: 3px; }
 .area-copy { color: var(--cyan); background: none; border: 0; padding: 3px; font: 10px var(--mono); text-decoration: underline; }
+.area-news-link { background:transparent; color:var(--cyan); border:0; border-bottom:1px solid currentColor; padding:3px 0; margin:8px 0; font:12px var(--sans); }
 @media (max-width: 720px) {
   .area-scroll { max-height: 42svh; }
   .area-choice, .area-disclosure > summary { padding-block: 8px; }

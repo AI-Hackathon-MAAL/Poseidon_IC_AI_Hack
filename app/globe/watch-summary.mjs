@@ -1,3 +1,6 @@
+import {newsPreview} from './news-feed.mjs';
+export {renderNewsFeed} from './news-feed.mjs';
+
 const records = value => Array.isArray(value) ? value : [];
 const labels = {
   resolve_identity: 'Identity check', activity_around_event: 'Activity around the event',
@@ -68,47 +71,6 @@ function section(title) {
   return section;
 }
 
-function articleURL(value) {
-  try {
-    const url = new URL(value);
-    if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password) return url;
-  } catch { /* Keep an article with a missing URL readable in the feed. */ }
-  return null;
-}
-
-function newsFeed(snapshot) {
-  const articles = [...records(snapshot.global_news)].sort((a, b) => timeOf(b.fetched_at) - timeOf(a.fetched_at));
-  const feed = section('Global intel' + (articles.length ? ' · ' + articles.length : ''));
-  if (!articles.length) {
-    feed.append(element('p', 'watch-empty', 'This publication contains no global intel articles.'));
-    return feed;
-  }
-  const list = element('ul', 'watch-list watch-news');
-  list.tabIndex = 0;
-  list.setAttribute('aria-label', 'Global intel articles');
-  for (const article of articles) {
-    const url = articleURL(article.url);
-    const item = element('li');
-    const heading = element(url ? 'a' : 'span', 'watch-title', article.title || 'Untitled article');
-    if (url) {
-      heading.href = url.href;
-      heading.target = '_blank';
-      heading.rel = 'noopener noreferrer';
-    }
-    const place = article.place_type === 'none' || !article.place_name ? 'Location unspecified' : article.place_name;
-    const scope = article.place_type === 'country' ? 'Country-level' : article.place_type === 'mpa' ? 'Protected area' : '';
-    item.append(element('span', 'watch-place', [place, scope].filter(Boolean).join(' · ')), heading);
-    if (article.snippet) item.append(element('p', 'watch-snippet', article.snippet));
-    const provider = article.provider?.toLowerCase() === 'linkup' ? 'Linkup' : article.provider;
-    const fetched = timeLabel(article.fetched_at);
-    const meta = [url?.hostname.replace(/^www\./, ''), provider && 'via ' + provider, fetched && 'Retrieved ' + fetched];
-    item.append(element('span', 'watch-meta', meta.filter(Boolean).join(' · ')));
-    list.append(item);
-  }
-  feed.append(list);
-  return feed;
-}
-
 function priorityQueue(cases, onCase) {
   const queue = section('Priority queue');
   const ranked = cases.filter(row => Number.isFinite(row.risk_score))
@@ -167,9 +129,11 @@ function agentActivity(cases, onCase) {
   return activity;
 }
 
-export function renderWatchSummary(body, snapshot, onCase) {
+export function renderWatchSummary(body, snapshot, onCase, onNews) {
   const cases = records(snapshot.cases);
   const content = element('div', 'watch-summary');
-  content.append(renderCounts(snapshot), newsFeed(snapshot), priorityQueue(cases, onCase), agentActivity(cases, onCase));
+  content.append(renderCounts(snapshot));
+  if (onNews) content.append(newsPreview(snapshot, onNews));
+  content.append(priorityQueue(cases, onCase), agentActivity(cases, onCase));
   body.replaceChildren(content);
 }

@@ -81,13 +81,13 @@ replay.addEventListener('click', () => {
   reveal();
 });
 $('brief-dialog').addEventListener('close', stopReplay);
-function renderReport(record, catalog) {
-  stopReplay();
-  renderSnapshotBrief(record, catalog);
-  replay.hidden = !timeline.querySelector('.step');
-  progress.textContent = '';
-}
-import('./workspace.mjs').then(({startWorkspace}) => {
+Promise.all([import('./workspace.mjs'), import('./agent-report.mjs')]).then(([{startWorkspace}, {renderAgentReport}]) => {
+  function renderReport(record, catalog) {
+    stopReplay();
+    renderAgentReport(record, catalog, {date});
+    replay.hidden = !timeline.querySelector('.step');
+    progress.textContent = '';
+  }
   startWorkspace({$, make, date, safeLink, renderReport});
 }).catch(() => {
   $('data-mode').textContent = 'Workspace unavailable';

@@ -1,12 +1,17 @@
 import {snapshotCatalog} from '../../public/snapshot-workspace.mjs';
 import {queryCases, queueStats, contextPoints, groupVessels} from '../../public/case-query.mjs';
 import {loadWorkspaceSnapshot, exportRevision} from './snapshot-loader.mjs';
-import {appendRunContext, appendCaseContext} from './agent-context.mjs';
+import {appendRunContext} from './agent-context.mjs';
 import {renderVesselPhoto} from '../../public/vessel-photo.mjs';
 import {mountAreaExplorer} from './area-explorer.mjs';
-import {renderWatchSummary} from './watch-summary.mjs';
+import {renderNewsFeed, renderWatchSummary} from './watch-summary.mjs';
 
 const statusNames = {complete: 'Completed', queued: 'Awaiting investigation', incomplete: 'Incomplete'};
+const fishingAuthorization = {
+  publicly_authorized: 'Public authorization matched',
+  not_matching_relevant_public_authorization: 'No matching public authorization',
+  pending_info: 'Unknown'
+};
 const shortArea = name => (name || '').replace(/\s*[-–]\s*Reserva Marina$/i, '');
 const samePoint = (a, b) => a && b && a.caseId === b.caseId && a.eventId === b.eventId &&
   a.role === b.role && a.lat === b.lat && a.lon === b.lon && a.markerTime === b.markerTime;
@@ -35,7 +40,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
   const briefDialog = $('brief-dialog');
   const watchDialog = $('watch-dialog');
   const areaTools = mountAreaExplorer({host:$('area-explorer'), searchHost:$('area-search-results'),
-    onArea: id => goArea(id), onFilter: () => renderQueue()});
+    onArea: id => goArea(id), onFilter: () => renderQueue(), onNews: id => openNews({scope:'area',areaId:id})});
   const shortDate = value => date(value).split(' · ')[0];
   const dateLabels = new Map();
   function displayDate(value) {
@@ -177,9 +182,12 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
         fact(event.event_type === 'gap' ? 'Reporting gap' : 'Event duration', measurement(event.duration_hours, 'h'));
         const detail = event.details || {};
         if (event.event_type === 'gap') {
+          const inside = point.role === 'gap-end' ? detail.gap_end_inside : detail.gap_start_inside;
+          if (typeof inside === 'boolean') fact('Recorded endpoint', inside ? 'Inside the protected area' : 'Outside the protected area');
           fact('Between gap endpoints', measurement(detail.gap_distance_km, 'km'));
           fact('Implied speed', measurement(detail.gap_implied_speed_knots, 'kn'));
         }
+        if (event.event_type === 'fishing') fact('Fishing authorization', fishingAuthorization[detail.authorization_status] || 'Unknown');
         if (event.event_type === 'encounter') fact('Encounter partner', detail.partner_vessel_name);
         fact('Distance from shore', measurement(detail.distance_from_shore_km, 'km'));
       }
@@ -358,6 +366,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     $('area').value = areaIndex.has(priorArea) ? priorArea : '';
     areaTools.update(next.snapshot, $('area').value);
     $('watch-button').disabled = false;
+    $('news-button').disabled = false;
     renderQueue();
   }
   function openWatchCase(raw) {
@@ -394,14 +403,10 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
       for (const source of region.rules_sources || []) el.append(safeLink(source.title || 'Source', source.url), make('br'));
     }
     if (data.news.length) {
-      const el = section('Regional news');
-      const list = make('ul',null,'export-rows');
-      for (const article of data.news) {
-        const row = make('li');
-        row.append(safeLink(article.title || 'Article', article.url), make('br'), make('small', [article.mpa_name, article.provider, article.fetched_at && shortDate(article.fetched_at)].filter(Boolean).join(' · ')));
-        list.append(row);
-      }
-      el.append(list);
+      const news = make('button','Browse regional news →','text-button');
+      news.type = 'button';
+      news.addEventListener('click', () => { $('export-dialog').close(); openNews({scope:'area'}); });
+      freshness.append(news);
     }
     if (data.runs.length) {
       const el = section('Published investigations');
@@ -436,10 +441,23 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     } finally { loading = false; refreshButton.disabled = false; }
   }
   $('area').addEventListener('change', () => goArea($('area').value));
+  function showWatchPanel(title) {
+    $('watch-title').textContent = title;
+    $('close-watch').setAttribute('aria-label','Close ' + title.toLowerCase());
+    if (!watchDialog.open) watchDialog.showModal();
+    watchDialog.scrollTop = 0;
+    $('close-watch').focus({preventScroll:true});
+  }
+  function openNews(options = {scope:'global'}) {
+    if (!catalog) return;
+    renderNewsFeed($('watch-detail'), catalog.snapshot, options);
+    showWatchPanel('News');
+  }
+  $('news-button').addEventListener('click', () => openNews());
   $('watch-button').addEventListener('click', () => {
     if (!catalog) return;
-    renderWatchSummary($('watch-detail'), catalog.snapshot, openWatchCase);
-    watchDialog.showModal();
+    renderWatchSummary($('watch-detail'), catalog.snapshot, openWatchCase, () => openNews());
+    showWatchPanel('Watch overview');
   });
   $('close-watch').addEventListener('click',()=>watchDialog.close());
   document.addEventListener('keydown',event=>{
@@ -474,9 +492,9 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
   $('investigate').addEventListener('click', () => {
     if (!selected?.snapshotCase.brief_markdown || selected.snapshotCase.status === 'queued') return;
     renderReport(selected, catalog);
-    appendCaseContext($('brief'), selected.snapshotCase);
     renderVesselPhoto($('report-photo'), selected);
     briefDialog.showModal();
+    briefDialog.scrollTop = 0;
   });
   $('view-export').addEventListener('click', showDataset);
   $('close-export').addEventListener('click', () => $('export-dialog').close());
