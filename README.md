@@ -35,7 +35,7 @@ The globe displays observations from the loaded dataset. It is not a live vessel
 >
 https://www.figma.com/design/CyICgl58TgTWa3TtqpyMOE/Poseidon-%E2%80%94-UI-Evolution-Timeline--Design-System---Screens?node-id=0-1&t=NNU29AkJKsMRGEBK-1
 
-![Poseidon project architecture and pipeline](docs/images/poseidon-pipeline.png)
+https://www.figma.com/board/JlvYfFIsZsemhRyRZA5qVE/Poseidon-System-Architecture--GFW---Linkup---Databricks---Python-App-?t=msP6ccf8lu9zZMlW-1
 -->
 
 ### How a website request runs
