@@ -1,21 +1,3 @@
-// The agent trace is the main evidence of autonomy, so the report shows it straight
-// after the summary numbers instead of collapsed at the end of the drawer. The panel
-// belongs to the dialog markup: it is parked back in the dialog before #brief is
-// cleared (otherwise it would be removed with it), then placed again.
-function parkTrace() {
-  const dialog = document.getElementById('brief-dialog');
-  const panel = dialog.querySelector('.activity-panel');
-  if (panel && panel.parentNode !== dialog) dialog.append(panel);
-  return panel;
-}
-function placeTrace(anchor) {
-  const panel = parkTrace();
-  if (!panel) return;
-  if (anchor) anchor.after(panel);
-  else document.getElementById('brief').append(panel);
-  panel.open = true;
-}
-
 function renderSnapshotBrief(record, catalog) {
   const data = record.snapshotCase;
   const snapshot = catalog.snapshot;
@@ -39,15 +21,21 @@ function renderSnapshotBrief(record, catalog) {
   const queued = data.status === 'queued';
   const status = { complete: 'Review ready', incomplete: 'Investigation incomplete', queued: 'Queued for investigation' };
   const body = $('brief');
-  parkTrace();
   body.className = 'brief-body';
   body.replaceChildren();
-  // Priority tag uses the same colour grammar as the vessel list and the map markers.
-  const level = queued ? 'queued' : data.risk_level || 'unknown';
-  $('priority').textContent = queued ? 'Not yet investigated'
-    : data.risk_level ? `${data.risk_level} priority${data.risk_score == null ? '' : ' · ' + data.risk_score}` : 'Priority unavailable';
-  $('priority').dataset.state = 'ready';
-  $('priority').dataset.level = level;
+  const priorityTag = $('priority');
+  const riskBand = data.risk_level ? String(data.risk_level).toLowerCase() : '';
+  priorityTag.dataset.state = 'ready';
+  priorityTag.dataset.risk = queued ? 'queued' : (riskBand || 'low');
+  if (queued) {
+    priorityTag.textContent = data.risk_score != null ? `QUEUED · ${data.risk_score}/100` : 'QUEUED';
+  } else if (riskBand) {
+    priorityTag.textContent = data.risk_score != null
+      ? `${riskBand.toUpperCase()} PRIORITY · ${data.risk_score}/100`
+      : `${data.risk_level} priority`;
+  } else {
+    priorityTag.textContent = 'Priority unavailable';
+  }
   $('activity-state').textContent = status[data.status] || 'Status unavailable';
   $('status').className = 'status';
   $('status').textContent = [record.synthetic ? 'Synthetic case' : catalog.origin,
@@ -125,12 +113,12 @@ function renderSnapshotBrief(record, catalog) {
   else body.append(make('p', data.headline || record.title || 'No case summary was exported.'));
 
   const overview = make('div', null, 'evidence-overview');
-  const metrics = [
-    ['Risk score', data.risk_score == null || queued ? '—' : `${data.risk_score}/100`],
+  for (const [label, value] of [
+    ['Risk score', data.risk_score != null ? `${data.risk_score}/100` : '—'],
+    ['Observations', events.length],
     ['Cited sources', sources.length],
-    ['Agent steps', steps.length],
-  ];
-  for (const [label, value] of metrics) {
+    ['Agent steps', steps.length || '—'],
+  ]) {
     const metric = make('div');
     metric.append(make('strong', String(value)), make('span', label));
     overview.append(metric);
@@ -149,25 +137,17 @@ function renderSnapshotBrief(record, catalog) {
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
-    const rerun = make('button', 'Re-run Python agent ↻', 'text-button');
+    const rerun = make('button', 'Re-run autonomous agent ↻', 'text-button');
     rerun.type = 'button';
     rerun.addEventListener('click', () => {
       document.dispatchEvent(new CustomEvent('poseidon:rerun-investigation', { detail: { caseId: data.case_id } }));
     });
     actions.append(download, rerun);
     body.append(actions);
-    placeTrace(actions);
   } else {
-    const note = make('p', queued ? 'The agent has queued this case. A brief will be available after investigation.'
-      : 'This export contains no written brief for this case.');
-    body.append(note);
-    placeTrace(note);
+    body.append(make('p', queued ? 'The agent has queued this case. A brief will be available after investigation.'
+      : 'This export contains no written brief for this case.'));
   }
-  const traceSummary = document.querySelector('#brief-dialog .activity-panel summary');
-  const byModel = steps.filter(step => step.decided_by === 'llm').length;
-  if (traceSummary) traceSummary.textContent = steps.length
-    ? `Agent trace · ${steps.length} step${steps.length === 1 ? '' : 's'} · ${byModel} chosen by the ${modelName.toLowerCase()}, ${steps.length - byModel} by fallback policy`
-    : 'Agent trace';
 
   const measured = make('details', null, 'runtime');
   measured.append(make('summary', `Recorded AIS observations · ${events.length}`));
@@ -255,9 +235,15 @@ function renderSnapshotBrief(record, catalog) {
   const score = make('details', null, 'runtime');
   score.append(make('summary', data.risk_score == null ? 'Review score unavailable' : `Review score · ${data.risk_score}/100`));
   const reasons = rows(data.reasons);
+  if (reasons.length) score.open = true;
   for (const reason of reasons) {
-    const points = Number.isFinite(reason.points) ? `${reason.points >= 0 ? '+' : ''}${reason.points} · ` : '';
-    score.append(make('div', points + (reason.text || 'Reason unavailable')));
+    const row = make('div', null, 'score-reason');
+    if (Number.isFinite(reason.points)) {
+      const pts = make('span', `${reason.points >= 0 ? '+' : ''}${reason.points}`, 'score-points');
+      row.append(pts);
+    }
+    row.append(make('span', reason.text || 'Reason unavailable', 'score-reason-text'));
+    score.append(row);
   }
   if (!reasons.length) score.append(make('div', 'No scoring reasons were exported.'));
   if (data.confidence) score.append(make('div', `Evidence confidence · ${data.confidence}`));
@@ -294,16 +280,17 @@ function renderSnapshotBrief(record, catalog) {
 
   const timeline = $('timeline');
   timeline.replaceChildren();
-  steps.forEach((step, index) => {
-    const row = make('div', null, step.ok === false ? 'step failed' : 'step');
+  for (const step of steps) {
+    const row = make('div', null, 'step');
     const content = make('div');
     const toolName = String(step.tool || 'Investigation check').replaceAll('_', ' ');
-    content.append(make('strong', `${step.step_no ?? index + 1}. ${toolName[0].toUpperCase() + toolName.slice(1)}`),
+    const prefix = step.step_no != null ? `${step.step_no}. ` : '';
+    content.append(make('strong', prefix + toolName[0].toUpperCase() + toolName.slice(1)),
       make('p', [decisionName(step.decided_by), step.ok === false && 'Check failed', step.at && date(step.at)].filter(Boolean).join(' · ')));
     if (step.reason) content.append(make('p', step.reason));
     if (step.result) content.append(make('p', step.result));
     row.append(content);
     timeline.append(row);
-  });
+  }
   if (!steps.length) timeline.append(make('p', queued ? 'Investigation has not started.' : 'No decision log was exported for this case.', 'activity-empty'));
 }

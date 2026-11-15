@@ -104,6 +104,7 @@
 .mar-picker[hidden] {display:none}
 .mar-picker-head,.mar-picker-item {display:flex;justify-content:space-between;gap:10px;align-items:center}
 .mar-picker-head {margin-bottom:6px}
+.mar-picker-head button.mar-button {display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;min-height:26px;padding:0;line-height:1}
 .mar-picker-search {width:100%;margin:0 0 5px;padding:6px 8px;background:#101a1c;color:#e5eee9;border:1px solid #587168}
 .mar-picker-list {max-height:min(200px,38vh);overflow:auto;overscroll-behavior:contain}
 .mar-picker-item {width:100%;min-height:34px;padding:5px 7px;background:none;border:0;border-top:1px solid #394a47;

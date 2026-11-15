@@ -198,7 +198,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     $('clear-point').hidden = false;
     $('clear-point').textContent = '← Back to area';
     $('investigate').disabled = false;
-    $('investigate-label').textContent = hasReport(selected) ? 'View agent report' : 'Run Python agent';
+    $('investigate-label').textContent = hasReport(selected) ? 'View agent report' : 'Run autonomous agent';
     $('investigate').lastElementChild.hidden = false;
   }
   function selectVessel(key, preferredCase) {
@@ -361,8 +361,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
       note.textContent = provenance;
     }
     const synthetic = next.snapshotSource === 'sample' || next.snapshot.synthetic === true || next.snapshot.data_source === 'sample';
-    const completed = next.snapshot.cases.filter(row => row.status === 'complete').length;
-    $('data-mode').textContent = synthetic ? 'SYNTHETIC DATA' : `${next.origin} · ${completed} completed`;
+    $('data-mode').textContent = synthetic ? 'SYNTHETIC DATA' : next.origin;
     $('data-mode').classList.toggle('synthetic-label', synthetic);
     const all = option('All protected areas', '');
     $('area').replaceChildren(all, ...next.areas.map(area => option(area.name, area.id)));
@@ -489,23 +488,21 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     $('investigate').disabled = true;
     $('priority').textContent = 'Investigating…';
     $('priority').dataset.state = '';
-    $('activity-state').textContent = 'Running Python agent';
+    $('activity-state').textContent = 'Running autonomous agent';
     $('status').className = 'status';
-    $('status').textContent = 'Running Poseidon Python investigation tools…';
+    $('status').textContent = 'Running Poseidon autonomous investigation tools…';
     $('report-photo').hidden = true;
     const body = $('brief');
-    window.parkTrace?.();
     body.className = 'brief-empty';
     body.replaceChildren(
       make('h3', `Investigating ${targetRecord.vessel || 'vessel'}.`),
-      make('p', 'Poseidon is running identity, ±72h activity, history, web search, deterministic scoring and brief generation in Python.')
+      make('p', 'Poseidon is running GFW identity & ±72h activity checks, Linkup live web search, deterministic risk scoring, and Databricks brief synthesis.')
     );
     const workingStep = make('div', null, 'step working');
     const stepCopy = make('div');
-    stepCopy.append(make('strong', 'Python autonomous investigation'), make('p', 'Selecting checks and evaluating evidence…'));
+    stepCopy.append(make('strong', 'Autonomous agent investigation'), make('p', 'Selecting checks and evaluating evidence…'));
     workingStep.append(stepCopy);
     $('timeline').replaceChildren(workingStep);
-    window.placeTrace?.();
     if (!briefDialog.open) briefDialog.showModal();
     try {
       const response = await fetch('/api/investigate', {
@@ -532,12 +529,12 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
         appendCaseContext($('brief'), updated.snapshotCase);
         renderVesselPhoto($('report-photo'), updated);
       }
-      message('Python investigation complete.');
+      message('Autonomous investigation complete.');
     } catch (err) {
       $('priority').textContent = 'Investigation error';
       $('activity-state').textContent = 'Request failed';
       $('status').className = 'status error';
-      $('status').textContent = err?.message || 'Unable to run Python investigation.';
+      $('status').textContent = err?.message || 'Unable to run autonomous investigation.';
       $('timeline').replaceChildren();
     } finally {
       investigating = false;

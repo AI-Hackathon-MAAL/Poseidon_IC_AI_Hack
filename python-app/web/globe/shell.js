@@ -41,12 +41,12 @@ $('date-toggle').addEventListener('click', () => {
 async function loadBackendStatus() {
   const box = $('backend-status-box');
   if (!box) return;
-  box.replaceChildren(make('div', 'Checking Python backend…'));
+  box.replaceChildren(make('div', 'Checking agent runtime…'));
   try {
     const res = await fetch('/api/status', {cache: 'no-store'});
     const s = await res.json();
     box.replaceChildren(
-      make('div', `Python engine · ${s.python_version} (${s.mode === 'live_cloud' ? 'Live cloud APIs' : 'Hybrid local snapshot'})`),
+      make('div', `Agent runtime · ${s.mode === 'live_cloud' ? 'Live cloud APIs' : 'Hybrid snapshot mode'}`),
       make('div', `Integrations · GFW ${s.gfw_live ? 'live' : 'snapshot'} · Linkup ${s.linkup_live ? 'live' : 'cached'} · Databricks ${s.databricks_live ? s.databricks_endpoint || 'live' : 'local fallback'}`),
       make('div', `Dataset · ${s.n_mpas} areas · ${s.n_cases} cases (${s.n_complete} completed, ${s.n_llm_briefs} LLM briefs)`)
     );
@@ -73,7 +73,7 @@ async function loadBackendStatus() {
       box.append(wrap);
     }
   } catch {
-    box.replaceChildren(make('div', 'Python backend status unavailable.'));
+    box.replaceChildren(make('div', 'Agent runtime status unavailable.'));
   }
 }
 $('help').addEventListener('click', () => {
