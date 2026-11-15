@@ -2,6 +2,8 @@
  "product": "Poseidon",
  "generated_at": "2026-11-14T22:38:28+00:00",
  "attribution": "Vessel activity data (c) Global Fishing Watch (apparent activity; non-commercial use). Protected-area outlines: UNEP-WCMC and IUCN, Protected Planet (WDPA). Web context via Linkup.",
+ "data_source": "gfw",
+ "synthetic": false,
  "disclaimer": "Every case is a lead for review, not proof of illegal fishing.",
  "latest_run": {
   "run_id": "34f47e40c942",

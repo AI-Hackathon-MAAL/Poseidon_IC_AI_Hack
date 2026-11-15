@@ -28,8 +28,8 @@ for m in mpas:
 world = intel.global_news(ctx.search, shapes, "2026-10-31", mode="history", window_start="2026-10-01",
                           run_id=out["run"][0]["run_id"], log=lambda *_: None)
 snapshot = contract.build_snapshot(out["run"], out["cases"], out["events"], out["steps"], out["news"],
-                                   out["mpa_context"], now_iso(), boundaries=shapes, global_news=world)
-snapshot["synthetic"] = True
+                                   out["mpa_context"], now_iso(), boundaries=shapes, global_news=world,
+                                   data_source="sample")
 target = ROOT / "data" / "poseidon_snapshot.sample.json"
 target.write_text(json.dumps(snapshot, indent=1, default=str, ensure_ascii=False), encoding="utf-8")
 print(f"Wrote {target} ({len(snapshot['cases'])} cases, {target.stat().st_size // 1024} KB)")

@@ -265,6 +265,13 @@ class Contract(unittest.TestCase):
         self.assertTrue(snap["cases"][0]["events"] and snap["cases"][0]["steps"])
         reserve = next(m for m in snap["mpas"] if m["mpa_id"] == "sample-1")
         self.assertEqual((reserve["n_cases"], reserve["n_gap"], reserve["n_fishing"]), (3, 2, 1))
+        self.assertNotIn("data_source", snap)   # unstamped when the caller does not say
+        real = contract.build_snapshot(out["run"], out["cases"], out["events"], out["steps"], [], [], "now",
+                                       data_source="gfw")
+        self.assertEqual((real["data_source"], real["synthetic"]), ("gfw", False))
+        fake = contract.build_snapshot(out["run"], out["cases"], out["events"], out["steps"], [], [], "now",
+                                       data_source="sample")
+        self.assertEqual((fake["data_source"], fake["synthetic"]), ("sample", True))
 
     def test_snapshot_accepts_rows_read_back_from_tables(self):
         out = run(make_ctx())

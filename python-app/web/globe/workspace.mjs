@@ -361,7 +361,8 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
       note.textContent = provenance;
     }
     const synthetic = next.snapshotSource === 'sample' || next.snapshot.synthetic === true || next.snapshot.data_source === 'sample';
-    $('data-mode').textContent = synthetic ? 'SYNTHETIC DATA' : next.origin;
+    const completed = next.snapshot.cases.filter(row => row.status === 'complete').length;
+    $('data-mode').textContent = synthetic ? 'SYNTHETIC DATA' : `${next.origin} · ${completed} completed`;
     $('data-mode').classList.toggle('synthetic-label', synthetic);
     const all = option('All protected areas', '');
     $('area').replaceChildren(all, ...next.areas.map(area => option(area.name, area.id)));
@@ -493,6 +494,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     $('status').textContent = 'Running Poseidon Python investigation tools…';
     $('report-photo').hidden = true;
     const body = $('brief');
+    window.parkTrace?.();
     body.className = 'brief-empty';
     body.replaceChildren(
       make('h3', `Investigating ${targetRecord.vessel || 'vessel'}.`),
@@ -503,6 +505,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     stepCopy.append(make('strong', 'Python autonomous investigation'), make('p', 'Selecting checks and evaluating evidence…'));
     workingStep.append(stepCopy);
     $('timeline').replaceChildren(workingStep);
+    window.placeTrace?.();
     if (!briefDialog.open) briefDialog.showModal();
     try {
       const response = await fetch('/api/investigate', {

@@ -850,3 +850,12 @@ main > footer {
   .topbar nav button span { display:none; }
   .topbar:has(.synthetic-label) { flex-wrap:wrap; height:auto; min-height:52px; padding-block:6px; }
 }
+
+/* Report drawer: risk colour grammar from the design system (02_Design_System). */
+.tag[data-level="high"] { color: #f3837f; border-color: #f3837f99; }
+.tag[data-level="medium"] { color: #e4b468; border-color: #e4b46899; }
+.tag[data-level="low"] { color: #77c5a3; border-color: #77c5a399; }
+.tag[data-level="queued"] { color: #93a5aa; border: 1px dashed #93a5aa; }
+.tag[data-level] { text-transform: uppercase; letter-spacing: .4px; }
+.activity-panel[open] > summary { margin-bottom: 4px; }
+.step.failed::before { content: '✗'; color: #f3aca0; }

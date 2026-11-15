@@ -384,7 +384,7 @@ snapshot = contract.build_snapshot(run_rows, scoped(all_cases), scoped(all_event
                                    scoped(read_rows("news")), scoped(read_rows("mpa_context")),
                                    datetime.now(timezone.utc).isoformat(timespec="seconds"),
                                    boundaries=scoped(read_rows("mpa_boundaries")),
-                                   global_news=read_rows("global_news"))
+                                   global_news=read_rows("global_news"), data_source=W["data_source"])
 print("Snapshot covers:", ", ".join(m["mpa_name"] for m in snapshot["mpas"]) or "no areas yet")
 snapshot_json = json.dumps(snapshot, default=str, ensure_ascii=False, indent=1)
 try:

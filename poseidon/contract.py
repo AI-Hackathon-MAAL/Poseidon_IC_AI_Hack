@@ -140,8 +140,12 @@ def mpa_status_rows(cases, events):
     return list(out.values())
 
 
-def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at, boundaries=(), global_news=()):
-    """Everything the front end needs in one JSON document (see docs/backend.md)."""
+def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at, boundaries=(), global_news=(),
+                   data_source=None):
+    """Everything the front end needs in one JSON document (see docs/backend.md).
+
+    data_source is "gfw" for real Global Fishing Watch data or "sample" for synthetic data.
+    The front ends use it to label the publication."""
     runs = sorted((parse_row("runs", r) for r in runs), key=lambda r: _s(r.get("finished_at")) or "", reverse=True)
     cases = [parse_row("cases", c) for c in cases]
     events = [parse_row("events", e) for e in events]
@@ -187,8 +191,9 @@ def build_snapshot(runs, cases, events, steps, news, mpa_context, generated_at, 
                      "rules_sources": ctx.get("rules_sources") or [],
                      "boundary": b.get("geometry"), "bbox": bbox, "boundary_source": b.get("source"),
                      "center_lat": lat, "center_lon": lon})
+    provenance = {} if data_source is None else {"data_source": data_source, "synthetic": data_source == "sample"}
     return {
-        "product": "Poseidon", "generated_at": generated_at, "attribution": ATTRIBUTION,
+        "product": "Poseidon", "generated_at": generated_at, "attribution": ATTRIBUTION, **provenance,
         "disclaimer": "Every case is a lead for review, not proof of illegal fishing.",
         "latest_run": runs[0] if runs else None,
         "runs": [{k: r.get(k) for k in ("run_id", "mode", "window_start", "window_end", "finished_at",
