@@ -52,3 +52,30 @@ test('hosted monitor uses its own identity and reads the newest export on each r
   assert.equal((await read()).data.latest_run.run_id, '2');
   assert.equal(logins, 1);
 });
+
+test('an unchanged publication answers with 304 and a changed one is sent compressed', async t => {
+  const read = createSnapshotReader({});
+  let data = (await read()).data;
+  const app = createApp({readSnapshot: async () => ({source: 'bundled-export', data})});
+  await new Promise((resolve, reject) => { app.once('error', reject); app.listen(0, '127.0.0.1', resolve); });
+  t.after(() => new Promise(resolve => app.close(resolve)));
+  const url = 'http://127.0.0.1:' + app.address().port + '/data/poseidon_snapshot.json';
+  const first = await fetch(url, {headers: {'Accept-Encoding': 'gzip'}});
+  assert.equal(first.status, 200);
+  assert.equal(first.headers.get('content-encoding'), 'gzip');
+  assert.equal(first.headers.get('x-poseidon-source'), 'bundled-export');
+  assert.equal((await first.json()).cases.length, data.cases.length);
+  const tag = first.headers.get('etag');
+  assert.ok(tag);
+  const again = await fetch(url, {headers: {'If-None-Match': tag}});
+  assert.equal(again.status, 304);
+  assert.equal(await again.text(), '');
+  data = {...data, generated_at: '2030-01-01T00:00:00+00:00'};
+  const changed = await fetch(url, {headers: {'If-None-Match': tag}});
+  assert.equal(changed.status, 200);
+  assert.notEqual(changed.headers.get('etag'), tag);
+  assert.equal((await changed.json()).generated_at, '2030-01-01T00:00:00+00:00');
+  const index = await fetch(new URL('/data/mpa_index.json', url), {headers: {'Accept-Encoding': 'gzip'}});
+  assert.equal(index.headers.get('content-encoding'), 'gzip');
+  assert.ok(Array.isArray(await index.json()));
+});

@@ -1,5 +1,6 @@
 import http from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { readFile, mkdir, writeFile, rename, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -28,6 +29,22 @@ const assets = new Map([
   ['/map-assets/pacific-relief.webp', ['map-assets/pacific-relief.webp', 'image/webp']]
 ]);
 const json = (res,status,data) => res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify(data));
+
+// The publication is several megabytes and every open page re-checks it each minute.
+// An ETag lets an unchanged publication answer with an empty 304, and gzip cuts a
+// changed one to roughly an eighth of its size. The compressed copy is kept until
+// the publication changes.
+let packed = {tag:'', gzip:null};
+function sendPublication(req, res, data, source) {
+  const text = JSON.stringify(data);
+  const tag = '"' + createHash('sha1').update(source).update(text).digest('base64url') + '"';
+  const headers = {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-cache',
+    ETag:tag, Vary:'Accept-Encoding', 'X-Poseidon-Source':source};
+  if (req.headers['if-none-match'] === tag) return res.writeHead(304, headers).end();
+  if (!/\bgzip\b/.test(req.headers['accept-encoding'] || '')) return res.writeHead(200, headers).end(text);
+  if (packed.tag !== tag) packed = {tag, gzip:gzipSync(text)};
+  return res.writeHead(200, {...headers, 'Content-Encoding':'gzip'}).end(packed.gzip);
+}
 
 async function body(req) {
   const chunks = [];
@@ -82,8 +99,7 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
       if (req.method === 'GET' && (path === '/api/snapshot' || path === '/data/poseidon_snapshot.json')) {
         try {
           const snapshot = await currentPublication();
-          res.setHeader('X-Poseidon-Source', snapshot.source);
-          return json(res, 200, snapshot.data);
+          return sendPublication(req, res, snapshot.data, snapshot.source);
         } catch (error) {
           let status = 503;
           if (path === '/data/poseidon_snapshot.json') {
@@ -130,7 +146,7 @@ export function createApp({dataDir = resolve(root,'.soundings','briefs'), candid
           return json(res,503,{error:'The Databricks investigation service is unavailable. Try again shortly.'});
         }
       }
-      if (req.method === 'GET' && await serveGlobe(path, res, jobs.enabled)) return;
+      if (req.method === 'GET' && await serveGlobe(path, res, jobs.enabled, req.headers['accept-encoding'])) return;
       if (req.method === 'GET' && assets.has(path)) {
         const [filename,type] = assets.get(path);
         const content = await readAsset(filename);

@@ -1,5 +1,6 @@
 import {readFile} from 'node:fs/promises';
 import {extname} from 'node:path';
+import {gzipSync} from 'node:zlib';
 
 const repository = new URL('../', import.meta.url);
 
@@ -24,7 +25,11 @@ const types = {
   '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webp': 'image/webp',
 };
 
-export async function serveGlobe(path, res, investigationsEnabled = false) {
+// Text resources compress well (the protected-area index shrinks from 1.5 MB to 0.3 MB).
+// Images and fonts are already compressed, so they are sent as they are.
+const compressed = new Map();
+
+export async function serveGlobe(path, res, investigationsEnabled = false, acceptEncoding = '') {
   if (path === '/app') {
     res.writeHead(302, {Location: '/app/'}).end();
     return true;
@@ -54,6 +59,17 @@ export async function serveGlobe(path, res, investigationsEnabled = false) {
     res.writeHead(200, {'Content-Type': types['.json'], 'Cache-Control':'no-cache'}).end('[]');
     return true;
   }
-  res.writeHead(200, {'Content-Type': types[extname(filename)], 'Cache-Control': 'no-cache'}).end(bytes);
+  const type = types[extname(filename)];
+  const headers = {'Content-Type': type, 'Cache-Control': 'no-cache'};
+  if (/^(?:text|application\/json)/.test(type) && /\bgzip\b/.test(acceptEncoding) && bytes.length > 2048) {
+    let entry = compressed.get(filename);
+    if (!entry || entry.length !== bytes.length) {
+      entry = {length: bytes.length, gzip: gzipSync(bytes)};
+      compressed.set(filename, entry);
+    }
+    res.writeHead(200, {...headers, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding'}).end(entry.gzip);
+    return true;
+  }
+  res.writeHead(200, {...headers, Vary: 'Accept-Encoding'}).end(bytes);
   return true;
 }
