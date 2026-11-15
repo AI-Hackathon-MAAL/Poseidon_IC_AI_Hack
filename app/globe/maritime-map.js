@@ -405,10 +405,8 @@
       dirty();
     }
     function openGlobe(){
-      if(data.vesselMode && data.onOverview){
-        if(!data.historyMode)reset('globe',false,true);
-        data.onOverview();
-      }else reset('globe',false,true);
+      if(data.vesselMode && data.onOverview)data.onOverview();
+      else reset('globe',false,true);
     }
     function currentScale(){
       return view.mode==='globe' ? view.mag : view.areaScale ?? areaScale(view.span);
@@ -470,6 +468,17 @@
     }
     const areaBtn=button('Fit map to the selected area','Area',()=>reset('area',data.historyMode,true,data.historyMode,true));
     const globeBtn=button('Show the 3D globe','Globe',openGlobe);
+    function updateGlobeButton(){
+      const canReturn=data.vesselMode && (data.historyMode || data.activeRegionId || view.mode==='area' || Math.abs(view.mag-1)>.01);
+      const label=canReturn?'Back to globe':'Show the 3D globe';
+      if(globeBtn.getAttribute('aria-label')!==label){
+        globeBtn.textContent=canReturn?'← Back to globe':'Globe';
+        globeBtn.setAttribute('aria-label',label);
+        globeBtn.title=label;
+      }
+      if(canReturn)globeBtn.removeAttribute('aria-pressed');
+      else globeBtn.setAttribute('aria-pressed',String(view.mode==='globe'));
+    }
     let showNewsMarkers=true;
     const noArticles=[];
     const newsBtn=button('Show news markers','News markers',()=>{
@@ -556,7 +565,8 @@
         ctx.shadowColor='rgba(94,176,190,.45)';ctx.shadowBlur=9;ctx.stroke();
         ctx.restore();
       }
-      for(const [btn,mode] of [[areaBtn,'area'],[globeBtn,'globe']])btn.setAttribute('aria-pressed',String(view.mode===mode));
+      updateGlobeButton();
+      areaBtn.setAttribute('aria-pressed',String(view.mode==='area'));
       const kmPerPx=6371/cam.radius;
       const rough=75*kmPerPx;
       const power=10**Math.floor(Math.log10(rough));
@@ -768,7 +778,7 @@
         (credits.length||validBounds(data.map)?' Published perimeter displayed.':'');
       if(activeRegionId && !historyMode && (oldRegion!==activeRegionId||wasHistory)){signature=key;reset('area',false,Boolean(oldRegion||wasHistory||wasVessel));}
       else if(!activeRegionId && oldRegion && !historyMode){signature=key;reset('globe',false,true);}
-      else if(next.overview && !activeRegionId && (wasHistory || !signature || key!==signature)){signature=key;reset('globe',false,wasHistory);}
+      else if(next.overview && !activeRegionId){signature=key;reset('globe',false,wasVessel);}
       else if(next.fitHistory && historyMode){signature=key;reset('area',true,wasVessel,true);}
       else if(!signature){signature=key;reset(next.focusArea?'area':'globe',Boolean(next.focusArea));}
       else if(next.focusArea){signature=key;reset('area',true,wasVessel);}

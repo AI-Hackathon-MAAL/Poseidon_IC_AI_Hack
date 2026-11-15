@@ -82,6 +82,16 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
     areaTools.update(catalog.snapshot, key);
     renderQueue({resetView:true});
   }
+  function backToGlobe() {
+    goArea('');
+    focusMap();
+  }
+  function focusMap() {
+    if ($('map').getBoundingClientRect().bottom < 140) {
+      $('map').scrollIntoView({behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block:'start'});
+    }
+    $('map').querySelector('.mar-stage')?.focus({preventScroll:true});
+  }
   function upOneLevel() {
     if (vessel) goArea(selected?.areaId || $('area').value);
     else if ($('area').value) goArea('');
@@ -99,7 +109,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
       else crumb.setAttribute('aria-current','location');
       bar.append(crumb);
     };
-    add('Globe',()=>goArea(''));
+    add('Globe',backToGlobe);
     if (id) add(shortArea(areaIndex.get(id)?.name || id),vessel ? ()=>goArea(id) : null);
     if (vessel) add(vessel.vesselName);
   }
@@ -113,7 +123,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
       contextPoints: anchors, vesselAnchor: point || vessel?.anchor, latestObservation: vessel?.anchor, focusPoint: point, focusArea: focus, overview, fitHistory,
       regions: catalog.snapshot.mpas, globalNews: catalog.snapshot.global_news || [], activeRegionId: regionId,
       areaEvents: selected ? selected.events.filter(eventMatches) : areaEvents,
-      onSelectRegion: goArea, onSelectVessel: selectVessel, onSelectObservation: selectObservation, onOverview: () => goArea('')
+      onSelectRegion: goArea, onSelectVessel: selectVessel, onSelectObservation: selectObservation, onOverview: backToGlobe
     });
     $('map-title').textContent = area?.name || 'All protected areas';
     $('map-caption').textContent = vessel ? vessel.vesselName + ' · ' + count(vessel.points.length, 'recorded position') :
@@ -493,10 +503,7 @@ export function startWorkspace({$, make, date, safeLink, renderReport}) {
   });
   $('clear-point').addEventListener('click', () => {
     upOneLevel();
-    if ($('map').getBoundingClientRect().bottom < 140) {
-      $('map').scrollIntoView({behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block:'start'});
-    }
-    $('map').querySelector('.mar-stage')?.focus({preventScroll:true});
+    focusMap();
   });
   function openReport(record) {
     if (!hasReport(record)) return;
