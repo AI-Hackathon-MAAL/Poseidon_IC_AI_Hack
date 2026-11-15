@@ -36,7 +36,7 @@ The globe displays observations from the loaded dataset. It is not a live vessel
 > Add your Figma link and exported diagram here. Suggested labels: website inputs → Python server → Databricks job → data collection → agent investigation → Delta tables / JSON export → website results.
 
 <!-- Replace this block with your real diagram and URL when ready:
-[View the architecture in Figma](YOUR_FIGMA_URL)
+[View the architecture in Figma](https://www.figma.com/design/CyICgl58TgTWa3TtqpyMOE/Poseidon-%E2%80%94-UI-Evolution-Timeline--Design-System---Screens?node-id=0-1&t=NNU29AkJKsMRGEBK-1)
 
 ![Poseidon project architecture and pipeline](docs/images/poseidon-pipeline.png)
 -->
